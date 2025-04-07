@@ -44,7 +44,6 @@ class ComponentSet<T : Component> : ComponentStorage {
         return dense[denseIndex].component
     }
 
-
     public func getAsKeyValues() -> LazySequence<[(entity: Entity, component: T)]> {
         return dense.lazy
     }
@@ -81,7 +80,6 @@ class ComponentSet<T : Component> : ComponentStorage {
 //     }
 // }
 
-// NOTE: maybe use ComponentMask max value to mark deleted components
 class EntityComponentSystem {
 
     var entityHasComponent : [ComponentMask] = []
@@ -133,16 +131,37 @@ class EntityComponentSystem {
         return t
     }
 
+    // foreach + storage.set and update have similar perf
+    // we can try using arrays' mutableBuffer but i don't think we'll get much better than this
+    // disappointing since the simple tuple of components has much better perf
+    // next stop is to add archetypes and store components often used together as tuples
+
+    // also we could put entityId out of ComponentEntry and into it's own array
+    // it makes some things like sorting harder to do though
+
+
     public func ForEach<T : Component, U : Component>(_ typeT : T.Type, _ typeU : U.Type)
-    -> LazyMapSequence<LazySequence<Zip2Sequence<LazyFilterSequence<LazySequence<[(entity: Entity, component: T)]>.Elements>, LazyFilterSequence<LazySequence<[(entity: Entity, component: U)]>.Elements>>>.Elements, (Entity, T, U)>
+    -> LazyMapSequence<LazyFilterSequence<LazySequence<[(entity: Entity, component: T)]>.Elements>, (Entity, T, U)>
     {
         let t :ComponentSet<T> = getStorage()
         let u :ComponentSet<U> = getStorage()
         let mask = componentMask(T.self) | componentMask(U.self)
-        return zip(
-            t.getAsKeyValues().filter { return self.hasComponents($0.entity, mask) },
-            u.getAsKeyValues().filter { return self.hasComponents($0.entity, mask) }
-        ).lazy.map({ return ($0.entity, $0.component, $1.component) })
+        return t.getAsKeyValues()
+            .filter { self.hasComponents($0.entity, mask) }
+            .map({ ($0.entity, $0.component, u.get($0.entity)!) })
+    }
+
+    public func update<T : Component, U : Component>(_ updatefn : (Entity, T, U) -> (T?, U?)){
+        let t :ComponentSet<T> = getStorage()
+        let u :ComponentSet<U> = getStorage()
+        let mask = componentMask(T.self) | componentMask(U.self)
+        for ((i, (e, cT)), (j, (_, cU))) in zip(
+            t.getAsKeyValues().enumerated().filter({ self.hasComponents($0.1.entity, mask) }),
+            u.getAsKeyValues().enumerated().filter({ self.hasComponents($0.1.entity, mask) }) ) {
+            let res = updatefn( e, cT, cU )
+            if let newT = res.0 { t.dense[i] = ( e, newT) }
+            if let newU = res.1 { u.dense[j] = ( e, newU) }
+        }
     }
 
 }

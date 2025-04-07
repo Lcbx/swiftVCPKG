@@ -15,10 +15,6 @@ let WINDOW_SIZE = Vec2(x:800, y:400)
 raylib.InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "hello world")
 raylib.SetTargetFPS(60)
 
-/// SOOOOO...
-/// classes are slowest, struct are better, and tuple of all components is fastest...
-/// maybe add container for tuples of associated structs instead of just foreach
-
 let SQUARE_N = 30000
 
 struct Position : Component {
@@ -74,6 +70,9 @@ while !raylib.WindowShouldClose()
         // maybe make ForEach return the index in storage since that's nore relevant than entity's id
         let positions = ecs.ForEach(Position.self)
         let velocities = ecs.ForEach(Velocity.self)
+        //ecs.update({(entity, position:Position, velocity:Velocity) in
+        //    var pos = position
+        //    var vel = velocity
         for (entity, var pos, var vel) in ecs.ForEach(Position.self, Velocity.self) {
            pos.x += vel.x
            pos.y += vel.y
@@ -85,7 +84,8 @@ while !raylib.WindowShouldClose()
            if pos.y > WINDOW_SIZE.y { pos.y = WINDOW_SIZE.y; vel.y = -vel.y }
             
            velocities.set((entity, vel))
-        }
+           //return (pos, vel)
+        } //)
 
           // for (i, var square) in squares.enumerated(){
              // DrawRectangleV(square.pos, Vec2(x:10,y:10), square.color);
