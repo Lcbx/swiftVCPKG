@@ -26,7 +26,8 @@ set(CMAKE_EXE_LINKER_FLAGS_DISTRIBUTION "${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
 set(VCPKG_INSTALLED "$ENV{VCPKG_ROOT}/installed/$ENV{VCPKG_TARGET_TRIPLET}")
 message(STATUS "VCPKG_INSTALLED: ${VCPKG_INSTALLED}")
 
-add_executable(swiftEngine sources/main.swift)
+FILE(GLOB SRC_FILES sources/*.swift)
+add_executable(swiftEngine ${SRC_FILES})
 target_compile_options(swiftEngine PRIVATE -cxx-interoperability-mode=default)
 
 
