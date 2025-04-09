@@ -38,15 +38,14 @@ struct Color : Component{
     public var data : raylib.Color
 }
 
-print("ecs")
 var ecs = ECScene();
-ecs.addComponentType(Position.self)
-ecs.addComponentType(Velocity.self)
-ecs.addComponentType(Color.self)
-print("component Types")
+
+ecs.addType(Position.self)
+ecs.addType(Velocity.self)
+ecs.addType(Color.self)
+
 ecs.createEntities(SQUARE_N/2)
 ecs.createEntities(SQUARE_N/2)
-print("entities")
 
 typealias Square = (pos : Vec2, vel: Vec2, color: raylib.Color)
 var squares = [Square]()
@@ -54,22 +53,21 @@ var squares = [Square]()
 for i in 0..<SQUARE_N{
     
      // squares.append(Square(
-        // pos:Vec2(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)),
-        // vel:Vec2(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0),
-        // color:rnd_color()))
+     //    pos:Vec2(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)),
+     //    vel:Vec2(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0),
+     //    color:rnd_color()))
     
-    ecs.addComponent(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)), entity:i)
-    ecs.addComponent(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0), entity:i)
-    ecs.addComponent(Color(data:rnd_color()), entity:i)
+    let entityProxy = ecs[Entity(i)]
+    entityProxy.add(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)))
+    entityProxy.add(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0))
+    entityProxy.add(Color(data:rnd_color()))
 }
-print("components")
 
-let positions = ecs.list(Position.self)!
-let velocities = ecs.list(Velocity.self)!
-print("component lists")
+let positions = ecs.list(Position.self)
+let velocities = ecs.list(Velocity.self)
 
-print(positions)
-print(velocities)
+print(positions.entryCount)
+
 
 while !raylib.WindowShouldClose()
 {
@@ -78,33 +76,50 @@ while !raylib.WindowShouldClose()
         raylib.ClearBackground(RAYWHITE)
         raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY)
 
+        let t = Task {
+            for i in 0..<(SQUARE_N/3+1) {
+                ecs.deleteEntity(i)
+            }
+
+            for i in 0..<SQUARE_N/3+1{
+                let entityProxy = ecs[Entity(i)]
+                entityProxy.add(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)))
+                entityProxy.add(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0))
+                entityProxy.add(Color(data:rnd_color()))
+            }
+        }
+
         for (_, pos, col) in ecs.forEach(Position.self, Color.self) {
            DrawRectangle(Int32(pos.x), Int32(pos.y), 10, 10, col.data);
         }
+
+        await t
 
         // TODO: find a better way to edit components
         // maybe make ForEach return the index in storage since that's more relevant than entity's id
         for (entity, var pos, var vel) in ecs.forEach(Position.self, Velocity.self) {
            pos.x += vel.x
            pos.y += vel.y
-           positions.set(entity, pos)
+           positions[entity] = pos
 
            if pos.x < 0 { pos.x = 0; vel.x = -vel.x }
            if pos.y < 0 { pos.y = 0; vel.y = -vel.y }
            if pos.x > WINDOW_SIZE.x { pos.x = WINDOW_SIZE.x; vel.x = -vel.x }
            if pos.y > WINDOW_SIZE.y { pos.y = WINDOW_SIZE.y; vel.y = -vel.y }
             
-           velocities.set(entity, vel)
+           velocities[entity] = vel
         }
 
+
+
           // for (i, var square) in squares.enumerated(){
-             // DrawRectangleV(square.pos, Vec2(x:10,y:10), square.color);
-             // square.pos += square.vel
-             // if square.pos.x < 0 { square.pos.x = 0; square.vel.x = -square.vel.x }
-             // if square.pos.y < 0 { square.pos.y = 0; square.vel.y = -square.vel.y }
-             // if square.pos.x > WINDOW_SIZE.x { square.pos.x = WINDOW_SIZE.x; square.vel.x = -square.vel.x }
-             // if square.pos.y > WINDOW_SIZE.y { square.pos.y = WINDOW_SIZE.y; square.vel.y = -square.vel.y }
-             // squares[i] = square
+          //    DrawRectangleV(square.pos, Vec2(x:10,y:10), square.color);
+          //    square.pos += square.vel
+          //    if square.pos.x < 0 { square.pos.x = 0; square.vel.x = -square.vel.x }
+          //    if square.pos.y < 0 { square.pos.y = 0; square.vel.y = -square.vel.y }
+          //    if square.pos.x > WINDOW_SIZE.x { square.pos.x = WINDOW_SIZE.x; square.vel.x = -square.vel.x }
+          //    if square.pos.y > WINDOW_SIZE.y { square.pos.y = WINDOW_SIZE.y; square.vel.y = -square.vel.y }
+          //    squares[i] = square
           // }
 
 
