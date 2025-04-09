@@ -1,6 +1,11 @@
 import Foundation
 import raylib
 
+#if DEBUG
+    print("Debug")
+#else
+    print("Release")
+#endif
 
 
 typealias Vec2 = raylib.Vector2
@@ -18,42 +23,53 @@ raylib.SetTargetFPS(60)
 let SQUARE_N = 30000
 
 struct Position : Component {
-    static var componentId = -1
+    static var typeId = TypeId(Self.self)
     public var x : Float
     public var y : Float
 }
 struct Velocity : Component {
-    static var componentId = -1
+    static var typeId = TypeId(Self.self)
     public var x : Float
     public var y : Float
 }
 
 struct Color : Component{
-    static var componentId = -1
+    static var typeId = TypeId(Self.self)
     public var data : raylib.Color
 }
 
-var ecs = EntityComponentSystem();
+print("ecs")
+var ecs = ECScene();
 ecs.addComponentType(Position.self)
 ecs.addComponentType(Velocity.self)
 ecs.addComponentType(Color.self)
-ecs.CreateEntities(SQUARE_N/2)
-ecs.CreateEntities(SQUARE_N/2)
+print("component Types")
+ecs.createEntities(SQUARE_N/2)
+ecs.createEntities(SQUARE_N/2)
+print("entities")
 
 typealias Square = (pos : Vec2, vel: Vec2, color: raylib.Color)
 var squares = [Square]()
 
 for i in 0..<SQUARE_N{
     
-     squares.append(Square(
-        pos:Vec2(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)),
-        vel:Vec2(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0),
-        color:rnd_color()))
+     // squares.append(Square(
+        // pos:Vec2(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)),
+        // vel:Vec2(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0),
+        // color:rnd_color()))
     
     ecs.addComponent(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)), entity:i)
     ecs.addComponent(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0), entity:i)
     ecs.addComponent(Color(data:rnd_color()), entity:i)
 }
+print("components")
+
+let positions = ecs.list(Position.self)!
+let velocities = ecs.list(Velocity.self)!
+print("component lists")
+
+print(positions)
+print(velocities)
 
 while !raylib.WindowShouldClose()
 {
@@ -62,30 +78,24 @@ while !raylib.WindowShouldClose()
         raylib.ClearBackground(RAYWHITE)
         raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY)
 
-        for (_, pos, col) in ecs.ForEach(Position.self, Color.self) {
+        for (_, pos, col) in ecs.forEach(Position.self, Color.self) {
            DrawRectangle(Int32(pos.x), Int32(pos.y), 10, 10, col.data);
         }
 
         // TODO: find a better way to edit components
-        // maybe make ForEach return the index in storage since that's nore relevant than entity's id
-        let positions = ecs.ForEach(Position.self)
-        let velocities = ecs.ForEach(Velocity.self)
-        //ecs.update({(entity, position:Position, velocity:Velocity) in
-        //    var pos = position
-        //    var vel = velocity
-        for (entity, var pos, var vel) in ecs.ForEach(Position.self, Velocity.self) {
+        // maybe make ForEach return the index in storage since that's more relevant than entity's id
+        for (entity, var pos, var vel) in ecs.forEach(Position.self, Velocity.self) {
            pos.x += vel.x
            pos.y += vel.y
-           positions.set((entity, pos))
+           positions.set(entity, pos)
 
            if pos.x < 0 { pos.x = 0; vel.x = -vel.x }
            if pos.y < 0 { pos.y = 0; vel.y = -vel.y }
            if pos.x > WINDOW_SIZE.x { pos.x = WINDOW_SIZE.x; vel.x = -vel.x }
            if pos.y > WINDOW_SIZE.y { pos.y = WINDOW_SIZE.y; vel.y = -vel.y }
             
-           velocities.set((entity, vel))
-           //return (pos, vel)
-        } //)
+           velocities.set(entity, vel)
+        }
 
           // for (i, var square) in squares.enumerated(){
              // DrawRectangleV(square.pos, Vec2(x:10,y:10), square.color);

@@ -26,9 +26,13 @@ set(CMAKE_EXE_LINKER_FLAGS_DISTRIBUTION "${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
 set(VCPKG_INSTALLED "$ENV{VCPKG_ROOT}/installed/$ENV{VCPKG_TARGET_TRIPLET}")
 message(STATUS "VCPKG_INSTALLED: ${VCPKG_INSTALLED}")
 
-FILE(GLOB SRC_FILES sources/*.swift)
+FILE(GLOB_RECURSE SRC_FILES sources/*.swift)
 add_executable(swiftEngine ${SRC_FILES})
 target_compile_options(swiftEngine PRIVATE -cxx-interoperability-mode=default)
+
+if(CMAKE_BUILD_TYPE STREQUAL Debug)
+  target_compile_options(swiftEngine PRIVATE -g -Onone -D DEBUG)
+endif()
 
 
 # general relevant linking for vcpkg
