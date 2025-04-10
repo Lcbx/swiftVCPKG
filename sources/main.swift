@@ -40,33 +40,31 @@ struct Color : Component{
 
 var ecs = ECScene();
 
-ecs.addType(Position.self)
-ecs.addType(Velocity.self)
-ecs.addType(Color.self)
-
-ecs.createEntities(SQUARE_N/2)
-ecs.createEntities(SQUARE_N/2)
+ecs.Component(Position.self)
+ecs.Component(Velocity.self)
+ecs.Component(Color.self)
 
 typealias Square = (pos : Vec2, vel: Vec2, color: raylib.Color)
 var squares = [Square]()
 
-for i in 0..<SQUARE_N{
-    
+ecs.createEntities(1)
+
+for i in ecs.createEntities(SQUARE_N){
      // squares.append(Square(
      //    pos:Vec2(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)),
      //    vel:Vec2(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0),
      //    color:rnd_color()))
     
-    let entityProxy = ecs[Entity(i)]
+    let entityProxy = ecs[i]
     entityProxy.add(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)))
     entityProxy.add(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0))
     entityProxy.add(Color(data:rnd_color()))
 }
 
+
 let positions = ecs.list(Position.self)
 let velocities = ecs.list(Velocity.self)
-
-print(positions.entryCount)
+let colors = ecs.list(Color.self)
 
 
 while !raylib.WindowShouldClose()
@@ -76,38 +74,65 @@ while !raylib.WindowShouldClose()
         raylib.ClearBackground(RAYWHITE)
         raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY)
 
-        let t = Task {
-            for i in 0..<(SQUARE_N/3+1) {
-                ecs.deleteEntity(i)
-            }
+        // let t = Task { }
 
-            for i in 0..<SQUARE_N/3+1{
-                let entityProxy = ecs[Entity(i)]
-                entityProxy.add(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)))
-                entityProxy.add(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0))
-                entityProxy.add(Color(data:rnd_color()))
-            }
-        }
+        // for (i, _) in positions.KeyValues().prefix(SQUARE_N/3+1) {
+        //      ecs.deleteEntity(i)
+        // }
+
+        // positions.upkeep()
+        // velocities.upkeep()
+        // colors.upkeep()
+
+        // for i in ecs.createEntities(SQUARE_N/3+1){
+        //     let entityProxy = ecs[i]
+        //     entityProxy.add(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)))
+        //     entityProxy.add(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0))
+        //     entityProxy.add(Color(data:rnd_color()))
+        // }
+
+        // print(positions.entryCount)
+        // print(velocities.entryCount)
+        // print(colors.entryCount)
+
+
+        // for (_, pos) in ecs.list(Position.self).KeyValues() {
+        //     DrawRectangle(Int32(pos.x), Int32(pos.y), 10, 10, rnd_color());
+        // }
+
 
         for (_, pos, col) in ecs.forEach(Position.self, Color.self) {
-           DrawRectangle(Int32(pos.x), Int32(pos.y), 10, 10, col.data);
+           DrawRectangleV(Vec2(x:pos.x, y:pos.y), Vec2(x:10,y:10), col.data);
         }
 
-        await t
+        //await t
 
-        // TODO: find a better way to edit components
-        // maybe make ForEach return the index in storage since that's more relevant than entity's id
-        for (entity, var pos, var vel) in ecs.forEach(Position.self, Velocity.self) {
-           pos.x += vel.x
-           pos.y += vel.y
-           positions[entity] = pos
+        // for (entity, pos, vel) in ecs.forEachModifiable(Position.self, Velocity.self) {
+        //     var p = pos.component
+        //     var v = vel.component
+        //     p.x += vel.component.x
+        //     p.y += vel.component.y
+        //     positions[pos] = p
 
-           if pos.x < 0 { pos.x = 0; vel.x = -vel.x }
-           if pos.y < 0 { pos.y = 0; vel.y = -vel.y }
-           if pos.x > WINDOW_SIZE.x { pos.x = WINDOW_SIZE.x; vel.x = -vel.x }
-           if pos.y > WINDOW_SIZE.y { pos.y = WINDOW_SIZE.y; vel.y = -vel.y }
+        //    if p.x < 0 { p.x = 0; v.x = -v.x }
+        //    if p.y < 0 { p.y = 0; v.y = -v.y }
+        //    if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
+        //    if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
             
-           velocities[entity] = vel
+        //    velocities[vel] = v
+        // }
+
+        for(entity, var p, var v) in ecs.forEach(Position.self, Velocity.self) {
+            p.x += v.x
+            p.y += v.y
+            positions[entity] = p
+
+           if p.x < 0 { p.x = 0; v.x = -v.x }
+           if p.y < 0 { p.y = 0; v.y = -v.y }
+           if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
+           if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
+            
+           velocities[entity] = v
         }
 
 
