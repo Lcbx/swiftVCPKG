@@ -47,7 +47,7 @@ ecs.Component(Color.self)
 typealias Square = (pos : Vec2, vel: Vec2, color: raylib.Color)
 var squares = [Square]()
 
-ecs.createEntities(1)
+let _ = ecs.createEntities(1)
 
 for i in ecs.createEntities(SQUARE_N){
      // squares.append(Square(
@@ -107,33 +107,33 @@ while !raylib.WindowShouldClose()
 
         //await t
 
-        // for (entity, pos, vel) in ecs.forEachModifiable(Position.self, Velocity.self) {
-        //     var p = pos.component
-        //     var v = vel.component
-        //     p.x += vel.component.x
-        //     p.y += vel.component.y
-        //     positions[pos] = p
-
-        //    if p.x < 0 { p.x = 0; v.x = -v.x }
-        //    if p.y < 0 { p.y = 0; v.y = -v.y }
-        //    if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
-        //    if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
-            
-        //    velocities[vel] = v
-        // }
-
-        for(entity, var p, var v) in ecs.forEach(Position.self, Velocity.self) {
+        for (pos, vel) in ecs.forEachModifiable(Position.self, Velocity.self) {
+            var p = pos.component
+            var v = vel.component
             p.x += v.x
             p.y += v.y
-            positions[entity] = p
+            positions[pos] = p
 
            if p.x < 0 { p.x = 0; v.x = -v.x }
            if p.y < 0 { p.y = 0; v.y = -v.y }
            if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
            if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
             
-           velocities[entity] = v
+           velocities[vel] = v
         }
+
+        // for(entity, var p, var v) in ecs.forEach(Position.self, Velocity.self) {
+        //     p.x += v.x
+        //     p.y += v.y
+        //     positions[entity] = p
+
+        //    if p.x < 0 { p.x = 0; v.x = -v.x }
+        //    if p.y < 0 { p.y = 0; v.y = -v.y }
+        //    if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
+        //    if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
+            
+        //    velocities[entity] = v
+        // }
 
 
 

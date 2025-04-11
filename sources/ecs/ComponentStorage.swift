@@ -13,7 +13,7 @@ protocol ComponentStorage {
     func remove(_ from:Entity)
 }
 
-typealias ComponentEntry<T : Component> = (entity:Entity, component:T)
+typealias ComponentEntry<T:Component> = (entity:Entity, component:T)
 
 // NOTE: I intend to support multiple components of same type per entity
 // by simply putting them next to each other in the same container
@@ -30,6 +30,10 @@ class ComponentSet<T : Component> : ComponentStorage {
     public var dense = [ComponentEntry<T>]()
 
     var deletedCount : Int = 0
+
+    public var internalCount : Int {
+        get { return dense.count }
+    }
 
     public var entryCount : Int {
         get { return dense.count - deletedCount }
@@ -80,11 +84,16 @@ class ComponentSet<T : Component> : ComponentStorage {
         set{ set(entity, newValue) }
     }
 
-    public subscript(_ cp : ComponentProxy<T>) -> T {
-        get{ return cp.component }
-        // can't be used to add component !
-        set{ setProxy(cp, newValue) }
+    public subscript(_ entity : Entity) -> ComponentEntry<T> {
+        get{ return get(entity) }
+        set{ set(newValue) }
     }
+
+    public subscript(_ cp : ComponentProxy<T>) -> T {
+       get{ return cp.component }
+       set{ setProxy(cp, newValue) }
+   }
+
 
     public func add(_ entity : Entity, _ component:T){
         add( (entity, component) )
@@ -100,23 +109,32 @@ class ComponentSet<T : Component> : ComponentStorage {
     }
 
     public func set(_ ce : ComponentEntry<T> ){
-        let i = sparse[ce.entity]
-        dense[i] = ce
+        let denseIndex = sparse[ce.entity]
+        dense[denseIndex] = ce
     }
 
     public func get(_ entity : Entity ) -> T {
-        let i = sparse[entity]
-        return dense[i].component
+        return get(entity).component
+    }
+
+    public func get(_ entity : Entity ) -> ComponentEntry<T> {
+        let denseIndex = sparse[entity]
+        return get_direct(denseIndex)
+    }
+
+    public func get_direct(_ denseIndex : Int ) -> ComponentEntry<T> {
+        return dense[denseIndex]
     }
 
     public func getProxy(_ entity : Entity ) -> ComponentProxy<T> {
-        let i = sparse[entity]
-        return ComponentProxy(denseIndex:i, value:dense[i])
+        let denseIndex = sparse[entity]
+        let entry = dense[denseIndex]
+        return ComponentProxy(entity:entry.entity, component:entry.component, denseIndex:denseIndex)
     }
 
-    public func setProxy(_ cp : ComponentProxy<T>, _ value : T) {
+    public func setProxy(_ cp : ComponentProxy<T>, _ component : T) {
         var ce = dense[cp.denseIndex]
-        ce.component = value
+        ce.component = component
         dense[cp.denseIndex] = ce
     }
 
@@ -124,34 +142,29 @@ class ComponentSet<T : Component> : ComponentStorage {
         return dense.lazy.filter{ $0.entity != EMPTY }
     }
 
-    public func iterateModify() -> ComponentProxySequence<T> {
-        return ComponentProxySequence(dense:dense)
+    public func iterateModify() -> LazySequence<ComponentProxySequence<T>> {
+        return ComponentProxySequence(storage:self).lazy
     }
 
 }
 
 struct ComponentProxySequence<T:Component> : Sequence, IteratorProtocol  {
-    var dense : [ComponentEntry<T>]
+    var storage : ComponentSet<T>
     var denseIndex : Int = -1
 
     public mutating func next() -> ComponentProxy<T>? {
+        var entry : ComponentEntry<T>
         repeat {
             denseIndex+=1
-            guard denseIndex < dense.count else { return nil }
-        } while dense[denseIndex].entity == EMPTY
-        return ComponentProxy(denseIndex:denseIndex, value: dense[denseIndex])
+            guard denseIndex < storage.internalCount else { return nil }
+            entry = storage.get_direct(denseIndex)
+        } while entry.entity == EMPTY
+        return ComponentProxy(entity:entry.entity, component:entry.component, denseIndex:denseIndex)
     }
 }
 
 struct ComponentProxy<T:Component> {
+    var entity : Entity
+    var component : T
     var denseIndex : Int
-    var value : ComponentEntry<T>
-
-    public var entity : Entity {
-        get{ return value.entity }
-    }
-
-    public var component : T {
-        get{ return value.component }
-    }
 }

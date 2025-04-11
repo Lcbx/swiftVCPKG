@@ -108,7 +108,7 @@ class ECScene {
     }
 
     public func forEach<T : Component, U : Component>(_ typeT : T.Type, _ typeU : U.Type)
-    -> LazyMapSequence<LazyFilterSequence<[(entity: Entity, component: T)]>, (Entity, T, U)>
+    -> LazyMapSequence<LazyFilterSequence<[ComponentEntry<T>]>, (Entity, T, U)>
     {
      let t = list(typeT)
      let u = list(typeU)
@@ -122,14 +122,14 @@ class ECScene {
     // not seeing though
     // maybe better when the sets are actually sparse
     public func forEachModifiable<T : Component, U : Component>(_ typeT : T.Type, _ typeU : U.Type)
-    -> [(Entity, ComponentProxySequence<T>.Element, ComponentProxy<U>)]
+    -> LazyMapSequence<LazyFilterSequence<LazySequence<ComponentProxySequence<T>>.Elements>, (LazyFilterSequence<LazySequence<ComponentProxySequence<T>>.Elements>.Element, ComponentProxy<U>)>
     {
      let t = list(typeT)
      let u = list(typeU)
      let mask = t.componentMask | u.componentMask
      return t.iterateModify()
          .filter{ self.hasComponents($0.entity, mask) }
-         .map({ ($0.entity, $0, u.getProxy($0.entity)) })
+         .map({ ($0, u.getProxy($0.entity)) })
     }
 
 }
