@@ -18,18 +18,26 @@ typealias ComponentEntry<T:Component> = (entity:Entity, component:T)
 // NOTE: I intend to support multiple components of same type per entity
 // by simply putting them next to each other in the same container
 // TODO: add getAll(entity) -> [Component]
+// TODO: add getAll(entity, criteria : (Component) -> Bool) -> [Component]
 // TODO: add delete(criteria : (Component) -> Bool)
 // TODO: when adding component, if already has some,
 //      move existing ones to end and add add last
 
+
+
+typealias DenseIndex = Int
 class ComponentSet<T : Component> : ComponentStorage {
 
     public var componentMask : ComponentMask = ComponentMask.max
 
-    var sparse = [Entity]()
-    public var dense = [ComponentEntry<T>]()
-
+    // sparse maps Entities to indices into dense
+    var sparse = [DenseIndex]()
+    var dense = [ComponentEntry<T>]()
     var deletedCount : Int = 0
+
+    public init(_ capacity : Int = 512){
+        self.dense.reserveCapacity(capacity)
+    }
 
     public var internalCount : Int {
         get { return dense.count }
@@ -43,9 +51,6 @@ class ComponentSet<T : Component> : ComponentStorage {
         get { return dense.count / deletedCount < 3 }
     }
 
-    public init(_ capacity : Int = 512){
-        self.dense.reserveCapacity(capacity)
-    }
 
     public func setComponentMask(_ mask :ComponentMask){
         self.componentMask = mask
@@ -54,9 +59,9 @@ class ComponentSet<T : Component> : ComponentStorage {
     public func setEntityCount(_ count :Int){
         if count < sparse.count { return }
         sparse.reserveCapacity(count)
-        // setting to 0 instead of EMPTY since it should not be relied on anyway
-        sparse += [Entity](repeating:0, count: count - sparse.count)
+        sparse += [DenseIndex](repeating:0, count: count - sparse.count)
     }
+
 
     func remove(_ entity:Entity){
         let i = sparse[entity]
@@ -83,16 +88,6 @@ class ComponentSet<T : Component> : ComponentStorage {
         get{ return get(entity) }
         set{ set(entity, newValue) }
     }
-
-    public subscript(_ entity : Entity) -> ComponentEntry<T> {
-        get{ return get(entity) }
-        set{ set(newValue) }
-    }
-
-    public subscript(_ cp : ComponentProxy<T>) -> T {
-       get{ return cp.component }
-       set{ setProxy(cp, newValue) }
-   }
 
 
     public func add(_ entity : Entity, _ component:T){
@@ -122,49 +117,40 @@ class ComponentSet<T : Component> : ComponentStorage {
         return get_direct(denseIndex)
     }
 
-    public func get_direct(_ denseIndex : Int ) -> ComponentEntry<T> {
+    public func get_direct(_ denseIndex : DenseIndex ) -> ComponentEntry<T> {
         return dense[denseIndex]
     }
 
-    public func getProxy(_ entity : Entity ) -> ComponentProxy<T> {
-        let denseIndex = sparse[entity]
-        let entry = dense[denseIndex]
-        return ComponentProxy(entity:entry.entity, component:entry.component, denseIndex:denseIndex)
+    public func iterate() -> ComponentSequence<T> {
+        return ComponentSequence(sequence:iterateWithEntity())
     }
 
-    public func setProxy(_ cp : ComponentProxy<T>, _ component : T) {
-        var ce = dense[cp.denseIndex]
-        ce.component = component
-        dense[cp.denseIndex] = ce
-    }
-
-    public func iterate() -> LazyFilterSequence<LazySequence<[ComponentEntry<T>]>.Elements> {
-        return dense.lazy.filter{ $0.entity != EMPTY }
-    }
-
-    public func iterateModify() -> LazySequence<ComponentProxySequence<T>> {
-        return ComponentProxySequence(storage:self).lazy
+    public func iterateWithEntity() -> ComponentEntrySequence<T> {
+        return ComponentEntrySequence(storage:self)
     }
 
 }
 
-struct ComponentProxySequence<T:Component> : Sequence, IteratorProtocol  {
+struct ComponentEntrySequence<T:Component> : Sequence, IteratorProtocol  {
     var storage : ComponentSet<T>
-    var denseIndex : Int = -1
+    var denseIndex : DenseIndex = -1
 
-    public mutating func next() -> ComponentProxy<T>? {
+    public mutating func next() -> ComponentEntry<T>? {
         var entry : ComponentEntry<T>
         repeat {
             denseIndex+=1
             guard denseIndex < storage.internalCount else { return nil }
             entry = storage.get_direct(denseIndex)
         } while entry.entity == EMPTY
-        return ComponentProxy(entity:entry.entity, component:entry.component, denseIndex:denseIndex)
+        return entry
     }
 }
 
-struct ComponentProxy<T:Component> {
-    var entity : Entity
-    var component : T
-    var denseIndex : Int
+struct ComponentSequence<T:Component> : Sequence, IteratorProtocol  {
+    var sequence : ComponentEntrySequence<T>
+    public mutating func next() -> T? {
+        if let ce = sequence.next(){ return ce.component}
+        return nil
+    }
 }
+

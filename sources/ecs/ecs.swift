@@ -1,27 +1,9 @@
 
-// TODO:
-// change foreach to use Componentsets as argument (not ecs itself)
-// add more foreach declinations
 
-struct EntityProxy{
-    var scene : ECScene
-    var entity : Entity
-
-    func add<T : Component>(_ component:T){
-        scene.add(entity, component)
-    }
-
-    //  TODO: could be useful
-    // public func addComponents(_ mask : ComponentMask)
-
-    func hasComponents(_ mask : ComponentMask ) -> Bool {
-        return scene.hasComponents(entity, mask)
-    }
-
-    func delete(){
-        scene.deleteEntity(entity)
-    }
-}
+// NOTE: there might be a point to have 2 dense arrays per component type
+// 1 reserved for reads and one for writes
+// then at frame end you swap them
+// maybe make it so it's a ComponentSet with entries of (Entry, T, T)
 
 class ECScene {
     var typeIdToComponentId = [TypeId : ComponentId]()
@@ -29,40 +11,38 @@ class ECScene {
 
     var maxEntities : Entity = 0
     var entityHasComponent = [ComponentMask]()
-    var deletedEntities = Set<Entity>()
+    var deletedEntities = [Entity]()
 
     public init(){
         deletedEntities.reserveCapacity(512)
     }
 
+    var entityCount : Int { return maxEntities - deletedEntities.count }
+
     // returns deleted entities if possible
-    // TODO: return a custom iterator
     public func createEntities(_ n: Int = 1) -> [Entity] {
         guard n > 0 else { return [] }
         var n = n
         var res = [Entity]()
         if !deletedEntities.isEmpty {
             let removed = min(n, deletedEntities.count)
-            for _ in 0..<removed {
-                res.append( deletedEntities.first! )
-                deletedEntities.removeFirst()
-            }
+            res += deletedEntities.suffix(n)
+            deletedEntities.removeLast(n)
             n -= removed
             if n == 0 { return res }
         }
-        defer {
-            maxEntities += n
-            for s in storages { s.setEntityCount(maxEntities) }
-        }
-        entityHasComponent += [ComponentMask](repeating: 0, count: n)
-        return res + (maxEntities..<maxEntities+n)
+        entityHasComponent += [ComponentMask](repeating: DELETED, count: n)
+        res += (maxEntities..<maxEntities+n)
+        maxEntities += n
+        for s in storages { s.setEntityCount(maxEntities) }
+        return res
     }
 
     public func Component<T : Component>(_ type: T.Type) {
         let typeId = TypeId(type)
         let componentId = typeIdToComponentId[typeId]
         guard componentId == nil else { return }
-        typeIdToComponentId[typeId] = typeIdToComponentId.count
+        typeIdToComponentId[typeId] = ComponentId(typeIdToComponentId.count)
         type.typeId = typeId
         let storage = ComponentSet<T>() as ComponentStorage
         addStorage(typeId, storage)
@@ -83,10 +63,10 @@ class ECScene {
     public func add<T : Component>(_ entity : Entity, _ component : T) {
         let typeId = T.self.typeId
         let componentId = typeIdToComponentId[typeId]!
-        let storage = storages[componentId] as! ComponentSet<T>
+        let storage = storages[Int(componentId)] as! ComponentSet<T>
         entityHasComponent[entity] |= storage.componentMask
         storage.add(entity, component)
-        storages[componentId] = storage // keep this !
+        storages[Int(componentId)] = storage // keep this !
     }
 
     public func hasComponents(_ entity : Entity, _ mask : ComponentMask ) -> Bool{
@@ -94,9 +74,9 @@ class ECScene {
     }
 
     func deleteEntity(_ entity:Entity){
-        guard entity < maxEntities && !deletedEntities.contains(entity) else { return }
-        deletedEntities.insert(entity)
-        defer { entityHasComponent[entity] = 0 }
+        guard entity < maxEntities && entityHasComponent[entity] != DELETED else { return }
+        defer { entityHasComponent[entity] = DELETED }
+        deletedEntities.append(entity)
         for (i,s) in storages.enumerated() where hasComponents(entity, 1<<i) {
             s.remove(entity);
         }
@@ -104,32 +84,56 @@ class ECScene {
 
     public func list<T : Component>(_ type : T.Type) -> ComponentSet<T> {
         let componentId = typeIdToComponentId[T.self.typeId]!
-        return storages[componentId] as! ComponentSet<T>
+        return storages[Int(componentId)] as! ComponentSet<T>
     }
 
-    public func forEach<T : Component, U : Component>(_ typeT : T.Type, _ typeU : U.Type)
-    -> LazyMapSequence<LazyFilterSequence<[ComponentEntry<T>]>, (Entity, T, U)>
+}
+
+struct EntityProxy{
+    var scene : ECScene
+    var entity : Entity
+
+    func add<T : Component>(_ component:T){
+        scene.add(entity, component)
+    }
+
+    //  TODO:
+    //public func addComponents(_ mask : ComponentMask)
+
+    func hasComponents(_ mask : ComponentMask ) -> Bool {
+        return scene.hasComponents(entity, mask)
+    }
+
+    func delete(){
+        scene.deleteEntity(entity)
+    }
+}
+
+
+
+// TODO: generate nth Component versions in another file
+extension ECScene {
+
+    func iterateWithEntity<T : Component, U : Component>(
+        _ t : ComponentSet<T>,
+        _ u : ComponentSet<U>)
+    -> [(Entity, T, U)]
     {
-     let t = list(typeT)
-     let u = list(typeU)
      let mask = t.componentMask | u.componentMask
-     return t.iterate()
+     return t.iterateWithEntity()
          .filter{ self.hasComponents($0.entity, mask) }
          .map({ ($0.entity, $0.component, u[$0.entity]) })
     }
 
-    // should be faster than setting through ComponentSet
-    // not seeing though
-    // maybe better when the sets are actually sparse
-    public func forEachModifiable<T : Component, U : Component>(_ typeT : T.Type, _ typeU : U.Type)
-    -> LazyMapSequence<LazyFilterSequence<LazySequence<ComponentProxySequence<T>>.Elements>, (LazyFilterSequence<LazySequence<ComponentProxySequence<T>>.Elements>.Element, ComponentProxy<U>)>
+    func iterate<T : Component, U : Component>(
+        _ t : ComponentSet<T>,
+        _ u : ComponentSet<U>)
+    -> [(T, U)]
     {
-     let t = list(typeT)
-     let u = list(typeU)
      let mask = t.componentMask | u.componentMask
-     return t.iterateModify()
+     return t.iterateWithEntity()
          .filter{ self.hasComponents($0.entity, mask) }
-         .map({ ($0, u.getProxy($0.entity)) })
+         .map({ ($0.component, u[$0.entity]) })
     }
 
 }
