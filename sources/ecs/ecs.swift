@@ -1,4 +1,6 @@
 
+// TODO : add tests
+
 
 // NOTE: there might be a point to have 2 dense arrays per component type
 // 1 reserved for reads and one for writes
@@ -31,7 +33,7 @@ class ECScene {
             n -= removed
             if n == 0 { return res }
         }
-        entityHasComponent += [ComponentMask](repeating: DELETED, count: n)
+        entityHasComponent += [ComponentMask](repeating: COMPONENT_DELETED, count: n)
         res += (maxEntities..<maxEntities+n)
         maxEntities += n
         for s in storages { s.setEntityCount(maxEntities) }
@@ -74,8 +76,8 @@ class ECScene {
     }
 
     func deleteEntity(_ entity:Entity){
-        guard entity < maxEntities && entityHasComponent[entity] != DELETED else { return }
-        defer { entityHasComponent[entity] = DELETED }
+        guard entity < maxEntities && entityHasComponent[entity] != COMPONENT_DELETED else { return }
+        defer { entityHasComponent[entity] = COMPONENT_DELETED }
         deletedEntities.append(entity)
         for (i,s) in storages.enumerated() where hasComponents(entity, 1<<i) {
             s.remove(entity);

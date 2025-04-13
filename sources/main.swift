@@ -100,18 +100,22 @@ while !raylib.WindowShouldClose()
         //     DrawRectangle(Int32(pos.x), Int32(pos.y), 10, 10, rnd_color());
         // }
 
-        for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
-           if p.x < 0 { p.x = 0; v.x = -v.x }
-           if p.y < 0 { p.y = 0; v.y = -v.y }
-           if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
-           if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
-           velocities[entity] = v
-        }
-
+        //await withTaskGroup(of: Void.self) { group in
+        //var t = Task { 
+                for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
+                   if p.x < 0 { p.x = 0; v.x = -v.x }
+                   if p.y < 0 { p.y = 0; v.y = -v.y }
+                   if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
+                   if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
+                   velocities[entity] = v
+                }
+        //    }
+        //}
         //NOTE: drawing must be on main thread
         for (pos, col) in ecs.iterate(positions, colors) {
            DrawRectangleV(Vec2(x:pos.x, y:pos.y), Vec2(x:10,y:10), col.data);
         }
+        //_ = await t;
 
         for(entity, var p, v) in ecs.iterateWithEntity(positions, velocities) {
             p.x += v.x

@@ -2,7 +2,7 @@
 
 // identifier for entities
 typealias Entity = Int
-let EMPTY = Entity.max
+let ENTITY_EMPTY = Entity.max
 
 typealias TypeId = ObjectIdentifier
 
@@ -11,7 +11,7 @@ typealias TypeId = ObjectIdentifier
 typealias ComponentId = UInt
 // we consider that either the entity just got created or got deleted
 // we might lose entities if people delete all components of an entity before deleting it
-let DELETED : ComponentId = 0
+let COMPONENT_DELETED : ComponentId = 0
 
 
 // Componentmask is one-hot encoded ComponentId
