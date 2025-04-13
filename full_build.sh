@@ -9,6 +9,4 @@ cmake  -G 'Ninja' -S . -B build >/dev/null #-DCMAKE_BUILD_TYPE=Debug
 #-DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
 cd build 
 
-#ninja -v \
-ninja \
-  && ./swiftEngine.exe >/dev/null
+ninja && ./swiftEngine.exe
