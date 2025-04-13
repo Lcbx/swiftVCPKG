@@ -68,7 +68,6 @@ class ECScene {
         let storage = storages[Int(componentId)] as! ComponentSet<T>
         entityHasComponent[entity] |= storage.componentMask
         storage.add(entity, component)
-        storages[Int(componentId)] = storage // keep this !
     }
 
     public func hasComponents(_ entity : Entity, _ mask : ComponentMask ) -> Bool{

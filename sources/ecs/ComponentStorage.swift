@@ -98,8 +98,8 @@ class ComponentSet<T : Component> : ComponentStorage {
     }
 
     // already components for this entity ?
-    // if it's the last added we can just add it
-    // otherwise move them to the end
+    // if it's the same entity as last added it's ok
+    // otherwise move them all to the end
     public func add(_ ce : ComponentEntry<T>){
         let entity = ce.entity
         if dense.count>0 && dense.last!.entity != entity && get(entity).entity == entity {

@@ -66,6 +66,7 @@ let positions = ecs.list(Position.self)
 let velocities = ecs.list(Velocity.self)
 let colors = ecs.list(Color.self)
 
+let dispatchGroup = DispatchGroup()
 
 while !raylib.WindowShouldClose()
 {
@@ -75,47 +76,22 @@ while !raylib.WindowShouldClose()
         raylib.ClearBackground(RAYWHITE)
         defer { raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY)}
 
-        // for _ in 0..<50{
-        //   let ce = (0..<ecs.maxEntities).randomElement()!
-        //   ecs.deleteEntity(Entity(ce))
-        // }
-
-        // for (i, _) in positions.KeyValues().prefix(SQUARE_N/3+1) {
-        //      ecs.deleteEntity(i)
-        // }
-
-        // positions.upkeep()
-        // velocities.upkeep()
-        // colors.upkeep()
-
-        // for i in ecs.createEntities(SQUARE_N/3+1){
-        //     let entityProxy = ecs[i]
-        //     entityProxy.add(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)))
-        //     entityProxy.add(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0))
-        //     entityProxy.add(Color(data:rnd_color()))
-        // }
-
-
-        // for pos in ecs.list(Position.self).iterate() {
-        //     DrawRectangle(Int32(pos.x), Int32(pos.y), 10, 10, rnd_color());
-        // }
-
-        //await withTaskGroup(of: Void.self) { group in
-        //var t = Task { 
-                for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
-                   if p.x < 0 { p.x = 0; v.x = -v.x }
-                   if p.y < 0 { p.y = 0; v.y = -v.y }
-                   if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
-                   if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
-                   velocities[entity] = v
-                }
-        //    }
-        //}
+        dispatchGroup.enter()
+        DispatchQueue.global(qos: .default).async { 
+            for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
+               if p.x < 0 { p.x = 0; v.x = -v.x }
+               if p.y < 0 { p.y = 0; v.y = -v.y }
+               if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
+               if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
+               velocities[entity] = v
+            }
+            dispatchGroup.leave()
+        }
         //NOTE: drawing must be on main thread
         for (pos, col) in ecs.iterate(positions, colors) {
            DrawRectangleV(Vec2(x:pos.x, y:pos.y), Vec2(x:10,y:10), col.data);
         }
-        //_ = await t;
+        dispatchGroup.wait()
 
         for(entity, var p, v) in ecs.iterateWithEntity(positions, velocities) {
             p.x += v.x
