@@ -3,9 +3,6 @@
 //typealias DenseIndex = Int
 //typealias ComponentEntry<T:Component> = (entity:Entity, component:T)
 
-// Compiles but trying to use it in ComponentStorage doesn't
-// protocol can't upcast/downcast C type into generic T type..?
-
 protocol StorageSet {
     associatedtype C : Component
 
@@ -17,7 +14,53 @@ protocol StorageSet {
     func set_direct(_ denseIndex : DenseIndex, _ entry : ComponentEntry<C>)
     func remove_direct(_ denseIndex:DenseIndex)
     func add_direct(_ ce : ComponentEntry<C>) -> Int
-} 
+}
+
+// TODO: adapt ComponentStorage to new underlying storage 
+
+// wrapper since swift is dumb
+struct AnyStorageSet<C: Component>: StorageSet {
+    private let _count: () -> Int
+    private let _get_dense: () -> [ComponentEntry<C>]
+    private let _upkeep: (Int) -> Bool
+
+    private let _get_direct: (DenseIndex) -> ComponentEntry<C>
+    private let _set_direct: (DenseIndex, ComponentEntry<C>) -> Void
+    private let _remove_direct: (DenseIndex) -> Void
+    private let _add_direct: (ComponentEntry<C>) -> Int
+
+    init<S: StorageSet>(_ storage: S) where S.C == C {
+        _count = { storage.count }
+        _get_dense = { storage.get_dense() }
+        _upkeep = { storage.upkeep(deleted: $0) }
+
+        _get_direct = { storage.get_direct($0) }
+        _set_direct = { storage.set_direct($0, $1) }
+        _remove_direct = { storage.remove_direct($0) }
+        _add_direct = { storage.add_direct($0) }
+    }
+
+    var count: Int { _count() }
+    func get_dense() -> [ComponentEntry<C>] { return _get_dense() }
+    func upkeep(deleted: Int) -> Bool { return _upkeep(deleted) }
+
+    func get_direct(_ denseIndex: DenseIndex) -> ComponentEntry<C> {
+        return _get_direct(denseIndex)
+    }
+
+    func set_direct(_ denseIndex: DenseIndex, _ entry: ComponentEntry<C>) {
+        _set_direct(denseIndex, entry)
+    }
+
+    func remove_direct(_ denseIndex: DenseIndex) {
+        _remove_direct(denseIndex)
+    }
+
+    func add_direct(_ ce: ComponentEntry<C>) -> Int {
+        return _add_direct(ce)
+    }
+}
+
 
 
 class SimpleSet<T : Component> : StorageSet {
