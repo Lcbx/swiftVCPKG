@@ -7,6 +7,7 @@ protocol StorageSet {
     associatedtype C : Component
 
     var count : Int { get }
+    var double_buffered : Bool { get }
     func get_dense() -> [ComponentEntry<C>]
     func upkeep(deleted:Int) -> Bool
 
@@ -16,11 +17,10 @@ protocol StorageSet {
     func add_direct(_ ce : ComponentEntry<C>) -> Int
 }
 
-// TODO: adapt ComponentStorage to new underlying storage 
-
 // wrapper since swift is dumb
-struct AnyStorageSet<C: Component>: StorageSet {
+struct StorageSetWrapper<C: Component>: StorageSet {
     private let _count: () -> Int
+    private let _double_buffered: () -> Bool
     private let _get_dense: () -> [ComponentEntry<C>]
     private let _upkeep: (Int) -> Bool
 
@@ -31,6 +31,7 @@ struct AnyStorageSet<C: Component>: StorageSet {
 
     init<S: StorageSet>(_ storage: S) where S.C == C {
         _count = { storage.count }
+        _double_buffered = { storage.double_buffered }
         _get_dense = { storage.get_dense() }
         _upkeep = { storage.upkeep(deleted: $0) }
 
@@ -40,24 +41,29 @@ struct AnyStorageSet<C: Component>: StorageSet {
         _add_direct = { storage.add_direct($0) }
     }
 
+    @inline(__always)
     var count: Int { _count() }
-    func get_dense() -> [ComponentEntry<C>] { return _get_dense() }
-    func upkeep(deleted: Int) -> Bool { return _upkeep(deleted) }
-
+    @inline(__always)
+    var double_buffered: Bool { _double_buffered() }
+    @inline(__always)
+    func get_dense() -> [ComponentEntry<C>] { _get_dense() }
+    @inline(__always)
+    func upkeep(deleted: Int) -> Bool { _upkeep(deleted) }
+    @inline(__always)
     func get_direct(_ denseIndex: DenseIndex) -> ComponentEntry<C> {
-        return _get_direct(denseIndex)
+        _get_direct(denseIndex)
     }
-
+    @inline(__always)
     func set_direct(_ denseIndex: DenseIndex, _ entry: ComponentEntry<C>) {
         _set_direct(denseIndex, entry)
     }
-
+    @inline(__always)
     func remove_direct(_ denseIndex: DenseIndex) {
         _remove_direct(denseIndex)
     }
-
+    @inline(__always)
     func add_direct(_ ce: ComponentEntry<C>) -> Int {
-        return _add_direct(ce)
+        _add_direct(ce)
     }
 }
 
@@ -67,38 +73,45 @@ class SimpleSet<T : Component> : StorageSet {
     typealias C = T
 
     public var dense = [ComponentEntry<T>]()
-    public var doubleBuffered : Bool { return false }
+    public var double_buffered : Bool { return false }
 
     public init(capacity : Int = 512){
         self.dense.reserveCapacity(capacity)
     }
 
+    @inline(__always)
     public var count : Int { get { return dense.count} }
 
+    @inline(__always)
     public func get_dense() -> [ComponentEntry<T>] {
         return dense
     }
 
+    @inline(__always)
     public func get_direct(_ denseIndex : DenseIndex ) -> ComponentEntry<T> {
         return dense[denseIndex]
     }
 
+    @inline(__always)
     public func set_direct(_ denseIndex : DenseIndex, _ entry : ComponentEntry<T>){
         dense[denseIndex] = entry
     }
 
+    @inline(__always)
     public func remove_direct(_ denseIndex:DenseIndex){
         dense[denseIndex].entity = ENTITY_EMPTY
     }
 
+    @inline(__always)
     public func add_direct(_ ce : ComponentEntry<T>) -> Int {
         let denseIndex = dense.count
         dense.append( ce )
         return denseIndex
     }
 
+    @inline(__always)
     public func upkeep(deleted:Int) -> Bool {
-        guard dense.count / deleted < 3 else { return false }
+        guard deleted > 0 && dense.count / deleted < 3 else { return false }
 
         // exploit that ENTITY_EMPTY is biggest number
         dense.sort(by:{ $0.entity < $1.entity})
@@ -114,32 +127,38 @@ class DoubleBufferedSet<T : Component> : StorageSet {
     // standard : dense is for read, dense2 is for write
     public var dense = [ComponentEntry<T>]()
     public var dense2 = [ComponentEntry<T>]()
-    public var doubleBuffered : Bool { return true }
+    public var double_buffered : Bool { return true }
 
     public init(capacity : Int = 512){
         self.dense.reserveCapacity(capacity)
         self.dense2.reserveCapacity(capacity)
     }
 
+    @inline(__always)
     public var count : Int { get { return dense.count} }
 
+    @inline(__always)
     public func get_dense() -> [ComponentEntry<T>] {
         return dense
     }
 
+    @inline(__always)
     public func get_direct(_ denseIndex : DenseIndex ) -> ComponentEntry<T> {
         return dense[denseIndex]
     }
 
+    @inline(__always)
     public func set_direct(_ denseIndex : DenseIndex, _ entry : ComponentEntry<T>){
         dense2[denseIndex] = entry
     }
 
+    @inline(__always)
     public func remove_direct(_ denseIndex:DenseIndex){
         dense[denseIndex].entity = ENTITY_EMPTY
         dense2[denseIndex].entity = ENTITY_EMPTY
     }
 
+    @inline(__always)
     public func add_direct(_ ce : ComponentEntry<T>) -> Int {
         let denseIndex = dense.count
         dense.append( ce )
@@ -147,10 +166,11 @@ class DoubleBufferedSet<T : Component> : StorageSet {
         return denseIndex
     }
 
+    @inline(__always)
     public func upkeep(deleted:Int) -> Bool {
         swap(&dense, &dense2)
 
-        guard dense.count / deleted < 3 else { return false }
+        guard deleted > 0 && dense.count / deleted < 3 else { return false }
         // exploit that ENTITY_EMPTY is biggest number
         dense.sort(by:{ $0.entity < $1.entity})
         dense.removeLast(deleted)

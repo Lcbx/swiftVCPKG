@@ -40,13 +40,13 @@ class ECScene {
         return res
     }
 
-    public func Component<T : Component>(_ type: T.Type) {
+    public func Component<T : Component>(_ type: T.Type, double_buffered:Bool=false) {
         let typeId = TypeId(type)
         let componentId = typeIdToComponentId[typeId]
         guard componentId == nil else { return }
         typeIdToComponentId[typeId] = ComponentId(typeIdToComponentId.count)
         type.typeId = typeId
-        let storage = ComponentSet<T>() as ComponentStorage
+        let storage = ComponentSet<T>(double_buffered:double_buffered) as ComponentStorage
         addStorage(typeId, storage)
     }
 
@@ -67,7 +67,7 @@ class ECScene {
         let componentId = typeIdToComponentId[typeId]!
         let storage = storages[Int(componentId)] as! ComponentSet<T>
         entityHasComponent[entity] |= storage.componentMask
-        storage.add(entity, component)
+        storage.add( (entity, component) )
     }
 
     public func hasComponents(_ entity : Entity, _ mask : ComponentMask ) -> Bool{

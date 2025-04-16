@@ -40,7 +40,8 @@ struct Color : Component{
 
 var ecs = ECScene();
 
-ecs.Component(Position.self)
+//ecs.Component(Position.self)
+ecs.Component(Position.self,double_buffered:true)
 ecs.Component(Velocity.self)
 ecs.Component(Color.self)
 
@@ -79,11 +80,14 @@ while !raylib.WindowShouldClose()
         dispatchGroup.enter()
         DispatchQueue.global(qos: .default).async { 
             for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
-               if p.x < 0 { p.x = 0; v.x = -v.x }
-               if p.y < 0 { p.y = 0; v.y = -v.y }
-               if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
-               if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
-               velocities[entity] = v
+                // p.x += v.x
+                // p.y += v.y
+                // positions[entity] = p
+                if p.x < 0 { p.x = 0; v.x = -v.x }
+                if p.y < 0 { p.y = 0; v.y = -v.y }
+                if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
+                if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
+                velocities[entity] = v
             }
             dispatchGroup.leave()
         }
@@ -93,11 +97,15 @@ while !raylib.WindowShouldClose()
         }
         dispatchGroup.wait()
 
-        for(entity, var p, v) in ecs.iterateWithEntity(positions, velocities) {
+        for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
             p.x += v.x
             p.y += v.y
             positions[entity] = p
         }
+
+        positions.upkeep()
+        velocities.upkeep()
+        colors.upkeep()
 
       // for (i, var square) in squares.enumerated(){
       //    DrawRectangleV(square.pos, Vec2(x:10,y:10), square.color);
