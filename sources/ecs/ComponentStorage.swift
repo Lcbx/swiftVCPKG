@@ -137,22 +137,34 @@ class ComponentSet<T : Component> : ComponentStorage {
         return ComponentEntrySequence(storage:self)
     }
 
+    // TODO: swapping buffers is needed each frame
+    // but defragmentation should be scheduled as a sort of job
+    // so it doesn't cause stutters when multiple components need to defragment at the same time
+    // at the very least we should call upkeep a different thread for each ComponentSet 
     public func upkeep() {
         // swap buffers
         //swap(&dense, &dense2!)
-        if double_buffered { dense = dense2! }
+        defer { if double_buffered { dense = dense2! } }
 
         guard deletedCount > 0 && dense.count / deletedCount < 3 else { return }
+        //print(dense.count, deletedCount)
         // exploit that ENTITY_EMPTY is biggest number
-        dense.sort(by:{ $0.entity < $1.entity})
-        dense.removeLast(deletedCount)
-        deletedCount = 0
-        for (i, ce) in dense.enumerated() {
-            sparse[ce.entity] = i
+        if double_buffered {
+            dense2!.sort(by:{ $0.entity < $1.entity})
+            dense2!.removeLast(deletedCount)
+            deletedCount = 0
+            for (i, ce) in dense2!.enumerated() {
+                sparse[ce.entity] = i
+            }
         }
-
-        // NOTE: we could avoid the double copy 
-        if double_buffered { dense = dense2! }
+        else{
+            dense.sort(by:{ $0.entity < $1.entity})
+            dense.removeLast(deletedCount)
+            deletedCount = 0
+            for (i, ce) in dense.enumerated() {
+                sparse[ce.entity] = i
+            }
+        }
     }
 
     @inline(__always)

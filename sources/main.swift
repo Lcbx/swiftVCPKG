@@ -40,7 +40,7 @@ struct Color : Component{
 
 var ecs = ECScene();
 
-ecs.Component(Position.self) //,double_buffered:true)
+ecs.Component(Position.self,double_buffered:true)
 ecs.Component(Velocity.self)
 ecs.Component(Color.self)
 
@@ -97,7 +97,7 @@ while !raylib.WindowShouldClose()
         }
         dispatchGroup.wait()
 
-        
+
         for (entity, _) in positions.iterateWithEntity().prefix(20){
             ecs.deleteEntity(entity)
         }
