@@ -40,8 +40,7 @@ struct Color : Component{
 
 var ecs = ECScene();
 
-//ecs.Component(Position.self)
-ecs.Component(Position.self,double_buffered:true)
+ecs.Component(Position.self) //,double_buffered:true)
 ecs.Component(Velocity.self)
 ecs.Component(Color.self)
 
@@ -77,16 +76,17 @@ while !raylib.WindowShouldClose()
         raylib.ClearBackground(RAYWHITE)
         defer { raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY)}
 
+
         dispatchGroup.enter()
         DispatchQueue.global(qos: .default).async { 
             for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
-                // p.x += v.x
-                // p.y += v.y
-                // positions[entity] = p
+                p.x += v.x
+                p.y += v.y
                 if p.x < 0 { p.x = 0; v.x = -v.x }
                 if p.y < 0 { p.y = 0; v.y = -v.y }
                 if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }
                 if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }
+                positions[entity] = p
                 velocities[entity] = v
             }
             dispatchGroup.leave()
@@ -97,10 +97,9 @@ while !raylib.WindowShouldClose()
         }
         dispatchGroup.wait()
 
-        for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
-            p.x += v.x
-            p.y += v.y
-            positions[entity] = p
+        
+        for (entity, _) in positions.iterateWithEntity().prefix(20){
+            ecs.deleteEntity(entity)
         }
 
         positions.upkeep()

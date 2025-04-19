@@ -29,9 +29,8 @@ if __name__ == "__main__":
 
     filtered_output = ''.join(map(
         lambda s:f"{RED}{s}{RESET}\n",
-        re.findall(r'([\w\-/\.]+:\d+:\d+:\s+error:.*)', combined_output)
+        re.findall(r'([\w\-/\.]+:\d+:\d+:\s+error:.*|error:.*)', combined_output)
     ))
-
 
     if filtered_output:
         print(filtered_output)

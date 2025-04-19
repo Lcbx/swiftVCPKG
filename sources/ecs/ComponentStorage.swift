@@ -24,26 +24,31 @@ class ComponentSet<T : Component> : ComponentStorage {
 
     // sparse maps Entities to indices into dense
     var sparse = [DenseIndex]()
-    //var storage : StorageSetWrapper<T>
-    var storage : SimpleSet<T>
+
+    // when double-buffered, dense is for reads, dense2 is for writes
+    var dense = [ComponentEntry<T>]()
+    var dense2 : [ComponentEntry<T>]?
+
     var deletedCount : Int = 0
 
+    public var double_buffered : Bool {
+        get { return dense2 != nil } 
+    }
+
     public init(double_buffered:Bool=false, capacity : Int = 512){
-        storage = SimpleSet<T>(capacity:capacity)
-        //if double_buffered {
-        //    storage = StorageSetWrapper(DoubleBufferedSet<T>(capacity:capacity))
-        //}
-        //else {
-        //    storage = StorageSetWrapper(SimpleSet<T>(capacity:capacity))
-        //}
+        dense.reserveCapacity(capacity)
+        if double_buffered {
+            dense2 = [ComponentEntry<T>]()
+            dense2!.reserveCapacity(capacity)
+        }
     }
 
     public var internalCount : Int {
-        get { return storage.count }
+        get { return dense.count }
     }
 
     public var entryCount : Int {
-        get { return storage.count - deletedCount }
+        get { return dense.count - deletedCount }
     }
 
 
@@ -54,34 +59,26 @@ class ComponentSet<T : Component> : ComponentStorage {
     public func setEntityCount(_ count :Int){
         if count < sparse.count { return }
         sparse.reserveCapacity(count)
-        sparse += [DenseIndex](repeating:0, count: count - sparse.count)
+        sparse += [DenseIndex](repeating:ENTITY_EMPTY, count: count - sparse.count)
     }
 
 
     func remove(_ entity:Entity){
         let denseIndex = sparse[entity]
-        guard storage.get_direct(denseIndex).entity == entity else { return }
-        storage.remove_direct(denseIndex)
+        guard get_direct(denseIndex).entity == entity else { return }
+        remove_direct(denseIndex)
         deletedCount += 1
     }
 
     func remove_at(_ entity:Entity, index:Int){
         let denseIndex = sparse[entity] + index
-        guard storage.get_direct(denseIndex).entity == entity else { return }
-        storage.remove_direct(denseIndex)
+        guard get_direct(denseIndex).entity == entity else { return }
+        remove_direct(denseIndex)
         deletedCount += 1
     }
 
-    public func upkeep() {
-        //print("sparse ", sparse.count, " dense ", dense.count, " deleted ", deletedCount)
-        guard storage.upkeep(deleted:deletedCount) else { return }
-        deletedCount = 0
-        for (i, (entity, _)) in storage.get_dense().enumerated() {
-            sparse[entity] = i
-        }
-    }
 
-    // can't be used to add component !
+    // NOTE: can't be used to add component
     public subscript(_ entity : Entity) -> T {
         get{ return get(entity).component }
         set{ set( (entity, newValue) ) }
@@ -93,43 +90,43 @@ class ComponentSet<T : Component> : ComponentStorage {
         // already components for this entity ?
         // if it's the same entity as last added it's ok
         // otherwise move them all to the end
-        if denseIndex != 0 && denseIndex < storage.count 
-          && storage.get_direct(denseIndex).entity==entity {
-            let newIndex = storage.add_direct( ce )
-            if storage.get_direct(storage.count-1).entity != entity {
+        if denseIndex != 0 && denseIndex < internalCount 
+          && get_direct(denseIndex).entity==entity {
+            let newIndex = add_direct( ce )
+            if get_direct(internalCount-1).entity != entity {
                 for (i, c) in getAll(entity).enumerated(){
-                    storage.add_direct( ce )
+                    add_direct( ce )
                     remove_at(entity, index:i)
                 }
                 sparse[entity] = newIndex
             }
         }
         else{
-            let denseIndex = storage.add_direct(ce)
+            let denseIndex = add_direct(ce)
             sparse[entity] = denseIndex
         }
     }
 
     public func set(_ ce : ComponentEntry<T> ){
         let denseIndex = sparse[ce.entity]
-        storage.set_direct(denseIndex, ce )
+        set_direct(denseIndex, ce )
     }
 
     // used for modifying a component among many associated with same entity
     public func set_at(_ entity : Entity, index : Int, component: T){
         let denseIndex = sparse[entity] + index
-        guard storage.get_direct(denseIndex).entity == entity else { return }
-        storage.set_direct(denseIndex, (entity, component) )
+        guard get_direct(denseIndex).entity == entity else { return }
+        set_direct(denseIndex, (entity, component) )
     }
 
     public func get(_ entity : Entity ) -> ComponentEntry<T> {
         let denseIndex = sparse[entity]
-        return storage.get_direct(denseIndex)
+        return get_direct(denseIndex)
     }
 
     public func getAll(_ entity : Entity ) -> EntityComponentsSequence<T> {
         let denseIndex = sparse[entity]
-        return EntityComponentsSequence(storage:storage,denseIndex:denseIndex,entity:entity)
+        return EntityComponentsSequence(storage:self,denseIndex:denseIndex,entity:entity)
     }
 
     public func iterate() -> ComponentSequence<T> {
@@ -137,20 +134,73 @@ class ComponentSet<T : Component> : ComponentStorage {
     }
 
     public func iterateWithEntity() -> ComponentEntrySequence<T> {
-        return ComponentEntrySequence(storage:storage)
+        return ComponentEntrySequence(storage:self)
     }
+
+    public func upkeep() {
+        // swap buffers
+        //swap(&dense, &dense2!)
+        if double_buffered { dense = dense2! }
+
+        guard deletedCount > 0 && dense.count / deletedCount < 3 else { return }
+        // exploit that ENTITY_EMPTY is biggest number
+        dense.sort(by:{ $0.entity < $1.entity})
+        dense.removeLast(deletedCount)
+        deletedCount = 0
+        for (i, ce) in dense.enumerated() {
+            sparse[ce.entity] = i
+        }
+
+        // NOTE: we could avoid the double copy 
+        if double_buffered { dense = dense2! }
+    }
+
+    @inline(__always)
+    public func get_direct(_ denseIndex : DenseIndex ) -> ComponentEntry<T> {
+        return dense[denseIndex]
+    }
+
+    @inline(__always)
+    public func set_direct(_ denseIndex : DenseIndex, _ entry : ComponentEntry<T>){
+        if double_buffered
+             { dense2![denseIndex] = entry }
+        else { dense[denseIndex] = entry }
+    }
+
+    @inline(__always)
+    public func remove_direct(_ denseIndex:DenseIndex){
+        if double_buffered{
+            var ce = dense2![denseIndex]
+            ce.entity = ENTITY_EMPTY
+            dense2![denseIndex] = ce
+        }
+        else{
+            var ce = dense[denseIndex]
+            ce.entity = ENTITY_EMPTY
+            dense[denseIndex] = ce
+        }
+    }
+
+    @inline(__always)
+    public func add_direct(_ ce : ComponentEntry<T>) -> Int {
+        let denseIndex = dense.count
+        dense.append( ce )
+        if double_buffered { dense2!.append( ce ) }
+        return denseIndex
+    }
+
 
 }
 
 struct EntityComponentsSequence<T:Component> : Sequence, IteratorProtocol  {
-    var storage : SimpleSet<T> // StorageSetWrapper<T>
+    var storage : ComponentSet<T>
     var denseIndex : DenseIndex 
     var entity : Entity
     public mutating func next() -> T? {
         var entry : ComponentEntry<T>
         repeat {
             denseIndex+=1
-            guard denseIndex < storage.count else { return nil }
+            guard denseIndex < storage.internalCount else { return nil }
             entry = storage.get_direct(denseIndex)
         } while entry.entity == ENTITY_EMPTY
         if entry.entity != entity { return nil } 
@@ -159,14 +209,14 @@ struct EntityComponentsSequence<T:Component> : Sequence, IteratorProtocol  {
 }
 
 struct ComponentEntrySequence<T:Component> : Sequence, IteratorProtocol  {
-    var storage : SimpleSet<T> // StorageSetWrapper<T>
+    var storage : ComponentSet<T>
     var denseIndex : DenseIndex = -1
 
     public mutating func next() -> ComponentEntry<T>? {
         var entry : ComponentEntry<T>
         repeat {
             denseIndex+=1
-            guard denseIndex < storage.count else { return nil }
+            guard denseIndex < storage.internalCount else { return nil }
             entry = storage.get_direct(denseIndex)
         } while entry.entity == ENTITY_EMPTY
         return entry
