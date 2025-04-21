@@ -40,7 +40,7 @@ struct Color : Component{
 
 var ecs = ECScene();
 
-ecs.Component(Position.self,double_buffered:true)
+ecs.Component(Position.self) //,double_buffered:true)
 ecs.Component(Velocity.self)
 ecs.Component(Color.self)
 
@@ -62,9 +62,9 @@ for i in ecs.createEntities(SQUARE_N){
 }
 
 
-let positions = ecs.list(Position.self)
-let velocities = ecs.list(Velocity.self)
-let colors = ecs.list(Color.self)
+let positions = ecs.GetSingleBufferSet(Position.self)!
+let velocities = ecs.GetSingleBufferSet(Velocity.self)!
+let colors = ecs.GetSingleBufferSet(Color.self)!
 
 let dispatchGroup = DispatchGroup()
 

@@ -40,7 +40,8 @@ class ECScene {
         guard componentId == nil else { return }
         typeIdToComponentId[typeId] = ComponentId(typeIdToComponentId.count)
         type.typeId = typeId
-        let storage = ComponentSet<T>(double_buffered:double_buffered) as ComponentStorage
+        let storage = ( double_buffered ?
+            DoubleBufferSet<T>() : SingleBufferSet<T>() ) as ComponentStorage
         addStorage(typeId, storage)
     }
 
@@ -59,7 +60,7 @@ class ECScene {
     public func add<T : Component>(_ entity : Entity, _ component : T) {
         let typeId = T.self.typeId
         let componentId = typeIdToComponentId[typeId]!
-        let storage = storages[Int(componentId)] as! ComponentSet<T>
+        let storage = storages[Int(componentId)] as! SingleBufferSet<T>
         entityHasComponent[entity] |= storage.componentMask
         storage.add( (entity, component) )
     }
@@ -77,9 +78,18 @@ class ECScene {
         }
     }
 
-    public func list<T : Component>(_ type : T.Type) -> ComponentSet<T> {
+    public func GetSingleBufferSet<T : Component>(_ type : T.Type) -> SingleBufferSet<T>? {
         let componentId = typeIdToComponentId[T.self.typeId]!
-        return storages[Int(componentId)] as! ComponentSet<T>
+        var storage = storages[Int(componentId)]
+        guard !storage.double_buffered else { return nil } 
+        return storage as! SingleBufferSet<T>
+    }
+
+    public func GetDoubleBufferSet<T : Component>(_ type : T.Type) -> DoubleBufferSet<T>? {
+        let componentId = typeIdToComponentId[T.self.typeId]!
+        var storage = storages[Int(componentId)]
+        guard storage.double_buffered else { return nil } 
+        return storage as! DoubleBufferSet<T>
     }
 
 }
@@ -110,23 +120,23 @@ struct EntityProxy{
 extension ECScene {
 
     func iterateWithEntity<T : Component, U : Component>(
-        _ t : ComponentSet<T>,
-        _ u : ComponentSet<U>)
+        _ t : SingleBufferSet<T>,
+        _ u : SingleBufferSet<U>)
     -> [(Entity, T, U)]
     {
      let mask = t.componentMask | u.componentMask
-     return t.iterateWithEntity()
+     return t.iterateWithEntity<T>()
          .filter{ self.hasComponents($0.entity, mask) }
          .map({ ($0.entity, $0.component, u[$0.entity]) })
     }
 
     func iterate<T : Component, U : Component>(
-        _ t : ComponentSet<T>,
-        _ u : ComponentSet<U>)
+        _ t : SingleBufferSet<T>,
+        _ u : SingleBufferSet<U>)
     -> [(T, U)]
     {
      let mask = t.componentMask | u.componentMask
-     return t.iterateWithEntity()
+     return t.iterateWithEntity<T>()
          .filter{ self.hasComponents($0.entity, mask) }
          .map({ ($0.component, u[$0.entity]) })
     }
