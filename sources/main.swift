@@ -68,6 +68,8 @@ let colors = ecs.list(Color.self)
 
 let dispatchGroup = DispatchGroup()
 
+var showMessageBox = true
+
 while !raylib.WindowShouldClose()
 {
     //let time = raylib.GetTime()
@@ -100,9 +102,23 @@ while !raylib.WindowShouldClose()
             ecs.deleteEntity(entity)
         }
 
-        // positions.upkeep()                                                                                       
-        // velocities.upkeep()                                                                                      
-        // colors.upkeep() 
+        if raylib.GuiButton(raylib.Rectangle(x:24,y:24,width:120,height:30), "#191#Show Message") != 0 {
+            showMessageBox = true
+        }
+
+        if showMessageBox
+        {
+            let result = raylib.GuiMessageBox(raylib.Rectangle(x:85,y:70,width:250,height:100),
+                "#191#Message Box", "Hi! This is a message!", "Nice;Cool");
+
+            if result >= 0 {
+                showMessageBox = false
+            }
+        }
+
+        positions.upkeep()                                                                                       
+        velocities.upkeep()                                                                                      
+        colors.upkeep() 
 
       // for (i, var square) in squares.enumerated(){
       //    DrawRectangleV(square.pos, Vec2(x:10,y:10), square.color);

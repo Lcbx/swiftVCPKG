@@ -38,31 +38,36 @@ endif()
 # general relevant linking for vcpkg
 target_compile_options(swiftEngine PRIVATE -I ${VCPKG_INSTALLED}/include -L ${VCPKG_INSTALLED}/lib)
 
-# using virtual file system to inject the modulemap
-# based on https://www.swift.org/documentation/articles/wrapping-c-cpp-library-in-swift.html
-
-
-function(add_vcpkg_dependency name)
-
+macro(define_vcpkg name)
   # some libs have their headers in a subdir
   if(EXISTS ${VCPKG_INSTALLED}/include/${name})
     set(INCLUDE_DIR ${VCPKG_INSTALLED}/include/${name})
     target_compile_options(swiftEngine PRIVATE -I ${VCPKG_INSTALLED}/include/${name})
+  
   else()
     set(INCLUDE_DIR ${VCPKG_INSTALLED}/include)
   endif()
 
-  target_compile_options(swiftEngine PRIVATE
-    -Xlinker ${VCPKG_INSTALLED}/lib/${name}.lib )
+  set(LIB_PATH ${VCPKG_INSTALLED}/lib/${name}.lib)
+  if(EXISTS LIB_PATH)
+    target_compile_options(swiftEngine PRIVATE -Xlinker LIB_PATH )
+  endif()
 
-  set("INCLUDE_DIR" ${INCLUDE_DIR})
-  set("MODULEMAP_FILE" "${CMAKE_CURRENT_SOURCE_DIR}/deps/${name}.modulemap")
+  set(${name}_DIR ${INCLUDE_DIR})
+  set(${name}_MODULEMAP "${CMAKE_CURRENT_SOURCE_DIR}/deps/${name}.modulemap")
+endmacro()
 
-  set(VFS_FILE deps/${name}-vfs.yaml)
-  configure_file(deps/module-vfs_template.yaml ${VFS_FILE})
-  target_compile_options(swiftEngine PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${VFS_FILE}>"
-  )
-endfunction()
+define_vcpkg(raylib)
+#define_vcpkg(raygui)
 
-add_vcpkg_dependency(raylib)
+add_subdirectory(deps/raygui)
+target_compile_options(swiftEngine PRIVATE -I ${CMAKE_BINARY_DIR}/deps/raygui/CMakeFiles/raygui.dir/raygui.c.obj )
+target_compile_options(swiftEngine PRIVATE -Xlinker ${CMAKE_BINARY_DIR}/deps/raygui/raygui.lib )
+
+# using virtual file system to inject the modulemap
+# based on https://www.swift.org/documentation/articles/wrapping-c-cpp-library-in-swift.html
+set(VFS_FILE deps/module-vfs.yaml)
+configure_file(deps/module-vfs_template.yaml ${VFS_FILE})
+target_compile_options(swiftEngine PRIVATE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${VFS_FILE}>"
+)
