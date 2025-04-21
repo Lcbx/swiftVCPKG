@@ -25,25 +25,25 @@ class ComponentSet<T : Component> : ComponentStorage {
     // sparse maps Entities to indices into dense
     var sparse = [DenseIndex]()
     var dense = [ComponentEntry<T>]()
+
     var deletedCount : Int = 0
 
-    public init(_ capacity : Int = 512){
-        self.dense.reserveCapacity(capacity)
+    public init(capacity : Int = 512){
+        dense.reserveCapacity(capacity)
     }
 
-    public var internalCount : Int {
+    @inline(__always)
+    public var count : Int {
         get { return dense.count }
     }
 
+    @inline(__always)
     public var entryCount : Int {
-        get { return dense.count - deletedCount }
-    }
-
-    var defragment_needed : Bool {
-        get { return dense.count / deletedCount < 3 }
+        get { return count - deletedCount }
     }
 
 
+    @inline(__always)
     public func setComponentMask(_ mask :ComponentMask){
         self.componentMask = mask
     }
@@ -51,93 +51,64 @@ class ComponentSet<T : Component> : ComponentStorage {
     public func setEntityCount(_ count :Int){
         if count < sparse.count { return }
         sparse.reserveCapacity(count)
-        sparse += [DenseIndex](repeating:0, count: count - sparse.count)
+        sparse += [DenseIndex](repeating:ENTITY_EMPTY, count: count - sparse.count)
     }
 
 
     func remove(_ entity:Entity){
         let denseIndex = sparse[entity]
-        guard dense[denseIndex].entity == entity else { return }
+        guard get_direct(denseIndex).entity == entity else { return }
         remove_direct(denseIndex)
+        deletedCount += 1
     }
 
     func remove_at(_ entity:Entity, index:Int){
         let denseIndex = sparse[entity] + index
-        guard dense[denseIndex].entity == entity else { return }
+        guard get_direct(denseIndex).entity == entity else { return }
         remove_direct(denseIndex)
-    }
-
-    func remove_direct(_ denseIndex:DenseIndex){
-        dense[denseIndex].entity = ENTITY_EMPTY
         deletedCount += 1
     }
 
-    public func upkeep() {
-        //print("sparse ", sparse.count, " dense ", dense.count, " deleted ", deletedCount)
-        guard defragment_needed else { return }
-        // exploit that ENTITY_EMPTY is biggest number
-        dense.sort(by:{ $0.entity < $1.entity})
-        dense.removeLast(deletedCount)
 
-        deletedCount = 0
-        for (i, (entity, _)) in dense.enumerated() {
-            sparse[entity] = i
-        }
-    }
-
-
-    // can't be used to add component !
+    // NOTE: can't be used to add component
     public subscript(_ entity : Entity) -> T {
-        get{ return get_component(entity) }
-        set{ set(entity, newValue) }
+        get{ return get(entity).component }
+        set{ set( (entity, newValue) ) }
     }
 
-
-    public func add(_ entity : Entity, _ component:T){
-        add( (entity, component) )
-    }
-
-    // already components for this entity ?
-    // if it's the same entity as last added it's ok
-    // otherwise move them all to the end
     public func add(_ ce : ComponentEntry<T>){
         let entity = ce.entity
-        if dense.count>0 && dense.last!.entity != entity && get(entity).entity == entity {
-            for (i, c) in getAll(entity).enumerated(){
-                add_direct( (entity, c) )
-                remove_at(entity, index:i)
+        let denseIndex = sparse[entity]
+        // already components for this entity ?
+        // if it's the same entity as last added it's ok
+        // otherwise move them all to the end
+        if denseIndex != 0 && denseIndex < count 
+          && get_direct(denseIndex).entity==entity {
+            let newIndex = add_direct( ce )
+            if get_direct(count-1).entity != entity {
+                for (i, c) in getAll(entity).enumerated(){
+                    add_direct( ce )
+                    remove_at(entity, index:i)
+                }
+                sparse[entity] = newIndex
             }
         }
-        add_direct(ce)
-    }
-
-    public func add_direct(_ ce : ComponentEntry<T>){
-        sparse[ce.entity] = dense.count
-        dense.append( ce )
-    }
-
-    public func set(_ entity : Entity, _ component:T){
-        set( (entity, component) )
+        else{
+            let denseIndex = add_direct(ce)
+            sparse[entity] = denseIndex
+        }
     }
 
     public func set(_ ce : ComponentEntry<T> ){
         let denseIndex = sparse[ce.entity]
-        dense[denseIndex] = ce
+        set_direct(denseIndex, ce )
     }
 
     // used for modifying a component among many associated with same entity
     public func set_at(_ entity : Entity, index : Int, component: T){
         let denseIndex = sparse[entity] + index
         guard get_direct(denseIndex).entity == entity else { return }
-        set_direct(denseIndex, component)
-    }
-
-    public func set_direct(_ denseIndex : DenseIndex, _ component : T){
-        dense[denseIndex].component = component
-    }
-
-    public func get_component(_ entity : Entity ) -> T {
-        return get(entity).component
+        set_direct(denseIndex, (entity, component) )
     }
 
     public func get(_ entity : Entity ) -> ComponentEntry<T> {
@@ -150,10 +121,6 @@ class ComponentSet<T : Component> : ComponentStorage {
         return EntityComponentsSequence(storage:self,denseIndex:denseIndex,entity:entity)
     }
 
-    public func get_direct(_ denseIndex : DenseIndex ) -> ComponentEntry<T> {
-        return dense[denseIndex]
-    }
-
     public func iterate() -> ComponentSequence<T> {
         return ComponentSequence(sequence:iterateWithEntity())
     }
@@ -161,6 +128,45 @@ class ComponentSet<T : Component> : ComponentStorage {
     public func iterateWithEntity() -> ComponentEntrySequence<T> {
         return ComponentEntrySequence(storage:self)
     }
+
+    // TODO: defragmentation should be scheduled as a sort of job
+    // so it doesn't cause stutters when multiple components need to defragment at the same time
+    // at the very least we should call upkeep a different thread for each ComponentSet 
+    public func upkeep() {
+        guard deletedCount > 0 && dense.count / deletedCount < 3 else { return }
+
+        dense.sort(by:{ $0.entity < $1.entity})
+        dense.removeLast(deletedCount)
+        deletedCount = 0
+        for (i, ce) in dense.enumerated() {
+            sparse[ce.entity] = i
+        }
+    }
+
+    @inline(__always)
+    public func get_direct(_ denseIndex : DenseIndex ) -> ComponentEntry<T> {
+        return dense[denseIndex]
+    }
+
+    @inline(__always)
+    public func set_direct(_ denseIndex : DenseIndex, _ entry : ComponentEntry<T>){
+        dense[denseIndex] = entry
+    }
+
+    @inline(__always)
+    public func remove_direct(_ denseIndex:DenseIndex){
+        var ce = dense[denseIndex]
+        ce.entity = ENTITY_EMPTY
+        dense[denseIndex] = ce
+    }
+
+    @inline(__always)
+    public func add_direct(_ ce : ComponentEntry<T>) -> Int {
+        let denseIndex = dense.count
+        dense.append( ce )
+        return denseIndex
+    }
+
 
 }
 
@@ -172,7 +178,7 @@ struct EntityComponentsSequence<T:Component> : Sequence, IteratorProtocol  {
         var entry : ComponentEntry<T>
         repeat {
             denseIndex+=1
-            guard denseIndex < storage.internalCount else { return nil }
+            guard denseIndex < storage.count else { return nil }
             entry = storage.get_direct(denseIndex)
         } while entry.entity == ENTITY_EMPTY
         if entry.entity != entity { return nil } 
@@ -188,7 +194,7 @@ struct ComponentEntrySequence<T:Component> : Sequence, IteratorProtocol  {
         var entry : ComponentEntry<T>
         repeat {
             denseIndex+=1
-            guard denseIndex < storage.internalCount else { return nil }
+            guard denseIndex < storage.count else { return nil }
             entry = storage.get_direct(denseIndex)
         } while entry.entity == ENTITY_EMPTY
         return entry

@@ -1,12 +1,6 @@
 
 // TODO : add tests
 
-
-// NOTE: there might be a point to have 2 dense arrays per component type
-// 1 reserved for reads and one for writes
-// then at frame end you swap them
-// maybe make it so it's a ComponentSet with entries of (Entry, T, T)
-
 class ECScene {
     var typeIdToComponentId = [TypeId : ComponentId]()
     var storages = [ComponentStorage]()
@@ -34,7 +28,7 @@ class ECScene {
             if n == 0 { return res }
         }
         entityHasComponent += [ComponentMask](repeating: COMPONENT_DELETED, count: n)
-        res += (maxEntities..<maxEntities+n)
+        res += (maxEntities..<maxEntities+n).lazy
         maxEntities += n
         for s in storages { s.setEntityCount(maxEntities) }
         return res
@@ -67,7 +61,7 @@ class ECScene {
         let componentId = typeIdToComponentId[typeId]!
         let storage = storages[Int(componentId)] as! ComponentSet<T>
         entityHasComponent[entity] |= storage.componentMask
-        storage.add(entity, component)
+        storage.add( (entity, component) )
     }
 
     public func hasComponents(_ entity : Entity, _ mask : ComponentMask ) -> Bool{
