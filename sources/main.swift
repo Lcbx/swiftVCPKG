@@ -1,5 +1,7 @@
 import Foundation
 import raylib
+import raygui
+import pocketpy
 
 #if DEBUG
     print("Debug")
@@ -102,13 +104,13 @@ while !raylib.WindowShouldClose()
             ecs.deleteEntity(entity)
         }
 
-        if raylib.GuiButton(raylib.Rectangle(x:24,y:24,width:120,height:30), "#191#Show Message") != 0 {
+        if raygui.GuiButton(raylib.Rectangle(x:24,y:24,width:120,height:30), "#191#Show Message") != 0 {
             showMessageBox = true
         }
 
         if showMessageBox
         {
-            let result = raylib.GuiMessageBox(raylib.Rectangle(x:85,y:70,width:250,height:100),
+            let result = raygui.GuiMessageBox(raylib.Rectangle(x:85,y:70,width:250,height:100),
                 "#191#Message Box", "Hi! This is a message!", "Nice;Cool");
 
             if result >= 0 {

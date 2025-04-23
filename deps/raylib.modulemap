@@ -2,6 +2,5 @@ module raylib {
     header "raylib.h"
     header "raymath.h"
     header "rlgl.h"
-    header "raygui.h" //hackish
     link "raylib"
 }

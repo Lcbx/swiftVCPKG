@@ -1,0 +1,3 @@
+module pocketpy {
+    header "pocketpy.h"
+}

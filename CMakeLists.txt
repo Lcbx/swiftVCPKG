@@ -57,12 +57,8 @@ macro(define_vcpkg name)
   set(${name}_MODULEMAP "${CMAKE_CURRENT_SOURCE_DIR}/deps/${name}.modulemap")
 endmacro()
 
-define_vcpkg(raylib)
-#define_vcpkg(raygui)
 
-add_subdirectory(deps/raygui)
-target_compile_options(swiftEngine PRIVATE -I ${CMAKE_BINARY_DIR}/deps/raygui/CMakeFiles/raygui.dir/raygui.c.obj )
-target_compile_options(swiftEngine PRIVATE -Xlinker ${CMAKE_BINARY_DIR}/deps/raygui/raygui.lib )
+define_vcpkg(raylib)
 
 # using virtual file system to inject the modulemap
 # based on https://www.swift.org/documentation/articles/wrapping-c-cpp-library-in-swift.html
@@ -71,3 +67,12 @@ configure_file(deps/module-vfs_template.yaml ${VFS_FILE})
 target_compile_options(swiftEngine PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${VFS_FILE}>"
 )
+
+macro(add_c_lib name)
+  add_subdirectory(deps/${name})
+  target_compile_options(swiftEngine PRIVATE -Xcc -I${CMAKE_CURRENT_SOURCE_DIR}/deps/${name} )
+  target_compile_options(swiftEngine PRIVATE -Xlinker ${CMAKE_BINARY_DIR}/deps/${name}/${name}.lib )
+endmacro()
+
+add_c_lib(raygui)
+add_c_lib(pocketpy)
