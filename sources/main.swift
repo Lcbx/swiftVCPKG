@@ -10,24 +10,18 @@ import pocketpy
 #endif
 
 
-typealias Vec2 = raylib.Vector2
-let rnd_uint8 = { return UInt8(raylib.GetRandomValue(0, 255)) }
-let rnd_color = { return raylib.Color(r: rnd_uint8(), g: rnd_uint8(), b: rnd_uint8(), a: 255) }
-
-let RAYWHITE = raylib.Color(r:255,g:255,b:255,a:255)
-let LIGHTGRAY = raylib.Color(r:100,g:100,b:100,a:255)
-
 let WINDOW_SIZE = Vec2(x:800, y:400)
 
 raylib.InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "hello world")
 raylib.SetTargetFPS(60)
 
-let SQUARE_N = 30000
+let SQUARE_N = 500
 
 struct Position : Component {
     static var typeId = TypeId(Self.self)
     public var x : Float
     public var y : Float
+    public var z : Float
 }
 struct Velocity : Component {
     static var typeId = TypeId(Self.self)
@@ -35,104 +29,113 @@ struct Velocity : Component {
     public var y : Float
 }
 
-struct Color : Component{
+
+struct Mesh : Component{
     static var typeId = TypeId(Self.self)
-    public var data : raylib.Color
+    public var color : raylib.Color
+    public var boundingBox : raylib.BoundingBox
+    //public var data : raylib.Model
 }
+
 
 var ecs = ECScene();
 
 ecs.Component(Position.self)
 ecs.Component(Velocity.self)
-ecs.Component(Color.self)
+ecs.Component(Mesh.self)
 
-typealias Square = (pos : Vec2, vel: Vec2, color: raylib.Color)
-var squares = [Square]()
 
-let _ = ecs.createEntities(1)
 
 for i in ecs.createEntities(SQUARE_N){
-     // squares.append(Square(
-     //    pos:Vec2(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)),
-     //    vel:Vec2(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0),
-     //    color:rnd_color()))
-    
-    let entityProxy = ecs[i]
-    entityProxy.add(Position(x:Float(i)*WINDOW_SIZE.x/Float(SQUARE_N),y:WINDOW_SIZE.y/Float(2)))
-    entityProxy.add(Velocity(x:Float(rnd_uint8())/255.0,y:Float(rnd_uint8())/255.0))
-    entityProxy.add(Color(data:rnd_color()))
+    let entity = ecs[i]
+    entity.add(Position(x: Float(raylib.GetRandomValue(-100, 100)),
+                        y: Float(raylib.GetRandomValue(-100, 100)),
+                        z: Float(raylib.GetRandomValue(-50, 50))
+    ))
+    entity.add(Velocity(x: Float(raylib.GetRandomValue(-100, 100))/25.0,
+                        y: Float(raylib.GetRandomValue(-100, 100))/25.0
+    ))
+    entity.add(Mesh(color:rnd_color(),
+        boundingBox:raylib.BoundingBox(
+        min: Vec3(x:Float(raylib.GetRandomValue(-5, 0)), y:Float(raylib.GetRandomValue(-5, 0)), z:Float(raylib.GetRandomValue(-5, 0))),
+        max: Vec3(x:Float(raylib.GetRandomValue(1, 5)), y:Float(raylib.GetRandomValue(1, 5)), z:Float(raylib.GetRandomValue(1, 5))))
+    ))
 }
 
+var camera = raylib.Camera(
+    position: Vec3(x: 0, y: 100, z: 0),
+    target: Vec3(x: 0, y: 0, z: 0),
+    up: Vec3(x: 0, y: 0, z: -1),
+    fovy: 60.0,
+    projection: raylib.CAMERA_PERSPECTIVE.rawValue
+)
+
+var camera2 = raylib.Camera(
+    position: Vec3(x: 10, y: 80, z: 10),
+    target: Vec3(x: 0, y: 0, z: 0),
+    up: Vec3(x: 0, y: 0, z: -1),
+    fovy: 45,
+    projection: raylib.CAMERA_PERSPECTIVE.rawValue
+)
 
 let positions = ecs.list(Position.self)
 let velocities = ecs.list(Velocity.self)
-let colors = ecs.list(Color.self)
+let meshes = ecs.list(Mesh.self)
 
-let dispatchGroup = DispatchGroup()
-
-var showMessageBox = true
 
 while !raylib.WindowShouldClose()
 {
-    //let time = raylib.GetTime()
+    let frameTime = Float(raylib.GetFrameTime())
     raylib.BeginDrawing()
-    repeat {
-        raylib.ClearBackground(RAYWHITE)
-        defer { raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY)}
+    raylib.ClearBackground(RAYWHITE)
+    //raylib.DrawGrid(25, 2.0);
 
-        dispatchGroup.enter()
-        DispatchQueue.global(qos: .default).async { 
-            for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
-                p.x += v.x                                                                                       
-                p.y += v.y                                                                                       
-                if p.x < 0 { p.x = 0; v.x = -v.x }                                                               
-                if p.y < 0 { p.y = 0; v.y = -v.y }                                                               
-                if p.x > WINDOW_SIZE.x { p.x = WINDOW_SIZE.x; v.x = -v.x }                                       
-                if p.y > WINDOW_SIZE.y { p.y = WINDOW_SIZE.y; v.y = -v.y }                                       
-                positions[entity] = p                                                                            
-                velocities[entity] = v  
-            }
-            dispatchGroup.leave()
+    defer {
+        raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY)
+        raylib.EndDrawing()
+    }      
+
+    for(entity, var p, var v) in ecs.iterateWithEntity(positions, velocities) {
+        p.x += v.x * frameTime                                                                                      
+        p.y += v.y * frameTime                                                                                       
+        if abs(p.x) > 100 { v.x = -v.x }
+        if abs(p.y) > 100 { v.y = -v.y }
+        positions[entity] = p
+        velocities[entity] = v
+    }
+
+    raylib.BeginMode3D(camera2)
+    var frustum = createFrustum(camera2)
+    raylib.EndMode3D()
+
+    //raylib.UpdateCamera(&camera, raylib.CAMERA_FIRST_PERSON.rawValue)
+    raylib.BeginMode3D(camera)
+    raylib.DrawSphere(camera2.position, 0.3, raylib.Color(r: 255, g: 255, b: 0, a: 255))
+    raylib.DrawLine3D(camera2.position, camera2.target, raylib.Color(r: 200, g: 100, b: 100, a: 255))
+    
+    //raylib.BeginMode3D(camera2)
+
+    //NOTE: drawing must be on main thread
+    //var frustum = createFrustum(camera)
+    for (pos, mesh) in ecs.iterate(positions, meshes) {
+        let bb = mesh.boundingBox
+        let bbCenter = raylib.Vector3Lerp(bb.min, bb.max, 0.5)
+        let bbSize = raylib.Vector3Subtract(bb.max, bb.min)
+        let transform = raylib.MatrixTranslate(pos.x,pos.z,pos.y)
+        let position = raylib.Vector3Transform(bbCenter, transform)
+
+        if frustumFilter(frustum,bb,transform) {
+            raylib.DrawCube(position, bbSize.x, bbSize.z, bbSize.y, mesh.color)
         }
-        //NOTE: drawing must be on main thread
-        for (pos, col) in ecs.iterate(positions, colors) {
-           DrawRectangleV(Vec2(x:pos.x, y:pos.y), Vec2(x:10,y:10), col.data);
+        else {
+            DrawCubeWires(position, bbSize.x + 0.1, bbSize.z + 0.1, bbSize.y + 0.1, raylib.Color(r:255,g:0,b:0,a:200))
         }
-        dispatchGroup.wait()
+    }
 
-        for (entity, _) in positions.iterateWithEntity().prefix(20){
-            ecs.deleteEntity(entity)
-        }
+    raylib.EndMode3D()
 
-        if raygui.GuiButton(raylib.Rectangle(x:24,y:24,width:120,height:30), "#191#Show Message") != 0 {
-            showMessageBox = true
-        }
-
-        if showMessageBox
-        {
-            let result = raygui.GuiMessageBox(raylib.Rectangle(x:85,y:70,width:250,height:100),
-                "#191#Message Box", "Hi! This is a message!", "Nice;Cool");
-
-            if result >= 0 {
-                showMessageBox = false
-            }
-        }
-
-        positions.upkeep()                                                                                       
-        velocities.upkeep()                                                                                      
-        colors.upkeep() 
-
-      // for (i, var square) in squares.enumerated(){
-      //    DrawRectangleV(square.pos, Vec2(x:10,y:10), square.color);
-      //    square.pos += square.vel
-      //    if square.pos.x < 0 { square.pos.x = 0; square.vel.x = -square.vel.x }
-      //    if square.pos.y < 0 { square.pos.y = 0; square.vel.y = -square.vel.y }
-      //    if square.pos.x > WINDOW_SIZE.x { square.pos.x = WINDOW_SIZE.x; square.vel.x = -square.vel.x }
-      //    if square.pos.y > WINDOW_SIZE.y { square.pos.y = WINDOW_SIZE.y; square.vel.y = -square.vel.y }
-      //    squares[i] = square
-      // }
-
-    } while false
-    raylib.EndDrawing()
+    positions.upkeep()                                                                                       
+    velocities.upkeep()                                                                                      
+    meshes.upkeep()
 }
 raylib.CloseWindow()
