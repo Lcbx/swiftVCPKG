@@ -17,6 +17,14 @@ func RunTask( task : @escaping () -> Void) {
 	}
 }
 
+extension Array {
+	func parallelFor(execute action : (Element) -> Void ){
+		DispatchQueue.concurrentPerform( iterations:self.count ){ i in
+			action( self[i] )
+		}
+	}
+}
+
 
 
 typealias Vec2 = raylib.Vector2
