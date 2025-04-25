@@ -4,7 +4,7 @@ import Foundation
 import raylib
 
 
-func createFrustum(_ camera: raylib.Camera3D, margin: Float = 1.0) -> [Vec4] {
+func createFrustum(margin: Float = 1.0) -> [Vec4] {
     let projection = raylib.rlGetMatrixProjection()
     let modelview = raylib.rlGetMatrixModelview()
     

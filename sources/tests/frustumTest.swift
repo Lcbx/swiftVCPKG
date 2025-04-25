@@ -100,18 +100,20 @@ func FrustumTest(){
         }
 
         raylib.BeginMode3D(camera2)
-        var frustum = createFrustum(camera2)
+        var frustum = createFrustum()
         raylib.EndMode3D()
 
         //raylib.UpdateCamera(&camera, raylib.CAMERA_FIRST_PERSON.rawValue)
         raylib.BeginMode3D(camera)
+        raylib.DrawGrid(25, 2.0);
+        
         raylib.DrawSphere(camera2.position, 0.3, raylib.Color(r: 255, g: 255, b: 0, a: 255))
         raylib.DrawLine3D(camera2.position, camera2.target, raylib.Color(r: 200, g: 100, b: 100, a: 255))
         
         //raylib.BeginMode3D(camera2)
 
         //NOTE: drawing must be on main thread
-        //var frustum = createFrustum(camera)
+        //var frustum = createFrustum()
         for (pos, mesh) in ecs.iterate(positions, meshes) {
             let bb = mesh.boundingBox
             let bbCenter = raylib.Vector3Lerp(bb.min, bb.max, 0.5)
