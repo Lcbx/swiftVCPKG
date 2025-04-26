@@ -12,8 +12,8 @@ import pocketpy
 
 let WINDOW_SIZE = Vec2(x:800, y:400)
 
-raylib.InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "hello world")
-raylib.SetTargetFPS(60)
+InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "hello world")
+SetTargetFPS(60)
 
 //FrustumTest()
 
@@ -36,9 +36,9 @@ struct Velocity : Component {
 
 struct Mesh : Component{
     static var typeId = TypeId(Self.self)
-    public var color : raylib.Color
-    public var boundingBox : raylib.BoundingBox
-    //public var data : raylib.Model
+    public var color : Color
+    public var boundingBox : BoundingBox
+    //public var data : Model
 }
 
 
@@ -53,28 +53,28 @@ ecs.Component(Mesh.self)
 for i in ecs.createEntities(SQUARE_N){
     let entity = ecs[i]
     entity.add(Position(
-        x: Float(raylib.GetRandomValue(-SPACE_SIZE, SPACE_SIZE)),
-        y: Float(raylib.GetRandomValue(0, 25)),
-        z: Float(raylib.GetRandomValue(-SPACE_SIZE, SPACE_SIZE))
+        x: Float(GetRandomValue(-SPACE_SIZE, SPACE_SIZE)),
+        y: Float(GetRandomValue(0, 25)),
+        z: Float(GetRandomValue(-SPACE_SIZE, SPACE_SIZE))
     ))
     entity.add(Velocity(
-        x: Float(raylib.GetRandomValue(-100, 100))/25.0,
+        x: Float(GetRandomValue(-100, 100))/25.0,
         y: 0,
-        z: Float(raylib.GetRandomValue(-100, 100))/25.0
+        z: Float(GetRandomValue(-100, 100))/25.0
     ))
     entity.add(Mesh(color:rnd_color(),
-        boundingBox:raylib.BoundingBox(
-        min: Vec3(x:Float(raylib.GetRandomValue(-5, 0)), y:Float(raylib.GetRandomValue(-5, 0)), z:Float(raylib.GetRandomValue(-5, 0))),
-        max: Vec3(x:Float(raylib.GetRandomValue(1, 5)), y:Float(raylib.GetRandomValue(1, 5)), z:Float(raylib.GetRandomValue(1, 5))))
+        boundingBox:BoundingBox(
+        min: Vec3(x:Float(GetRandomValue(-5, 0)), y:Float(GetRandomValue(-5, 0)), z:Float(GetRandomValue(-5, 0))),
+        max: Vec3(x:Float(GetRandomValue(1, 5)), y:Float(GetRandomValue(1, 5)), z:Float(GetRandomValue(1, 5))))
     ))
 }
 
-var camera = raylib.Camera(
+var camera = Camera(
     position: Vec3(x: 20, y: 60, z: 20),
     target: Vec3(x: 0, y: 0, z: 0),
     up: Vec3(x: 0, y: 1, z: 0),
     fovy: 60.0,
-    projection: raylib.CAMERA_PERSPECTIVE.rawValue
+    projection: CAMERA_PERSPECTIVE.rawValue
 )
 
 
@@ -562,15 +562,15 @@ let planeMesh = GenMeshPlane(25.0, 25.0, 1, 1)
 let planeModel = LoadModelFromMesh(planeMesh)
 
 
-while !raylib.WindowShouldClose()
+while !WindowShouldClose()
 {
-    let frameTime = Float(raylib.GetFrameTime())
-    raylib.BeginDrawing()
-    raylib.ClearBackground(RAYWHITE)
+    let frameTime = Float(GetFrameTime())
+    BeginDrawing()
+    ClearBackground(RAYWHITE)
 
     defer {
-        raylib.DrawText("\(raylib.GetFPS())", 10, 10, 20, LIGHTGRAY) 
-        raylib.EndDrawing()
+        DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY) 
+        EndDrawing()
     }      
 
 
@@ -605,7 +605,7 @@ while !raylib.WindowShouldClose()
 
 
     // main scene
-    raylib.BeginMode3D(camera)
+    BeginMode3D(camera)
     //BeginShaderMode(sceneShader)
 
     var slot = 10; // Can be anything 0 to 15, but 0 will probably be taken up
@@ -640,13 +640,13 @@ while !raylib.WindowShouldClose()
     drawScene()
 
     //EndShaderMode()
-    raylib.EndMode3D()
+    EndMode3D()
 
     positions.upkeep()                                                                                       
     velocities.upkeep()                                                                                      
     meshes.upkeep()
 }
-raylib.CloseWindow()
+CloseWindow()
 
 func drawScene(){
     DrawModel(planeModel, Vector3(x: 0, y: -1, z: 0), 3.5, LIGHTGRAY)
@@ -655,13 +655,13 @@ func drawScene(){
     var frustum = createFrustum()
     for (pos, mesh) in ecs.iterate(positions, meshes) {
         let bb = mesh.boundingBox
-        let bbCenter = raylib.Vector3Lerp(bb.min, bb.max, 0.5)
-        let bbSize = raylib.Vector3Subtract(bb.max, bb.min)
-        let transform = raylib.MatrixTranslate(pos.x,pos.y,pos.z)
-        let position = raylib.Vector3Transform(bbCenter, transform)
+        let bbCenter = Vector3Lerp(bb.min, bb.max, 0.5)
+        let bbSize = Vector3Subtract(bb.max, bb.min)
+        let transform = MatrixTranslate(pos.x,pos.y,pos.z)
+        let position = Vector3Transform(bbCenter, transform)
 
         guard frustumFilter(frustum,bb,transform) else { continue }
-        raylib.DrawCube(position, bbSize.x, bbSize.y, bbSize.z, mesh.color)
+        DrawCube(position, bbSize.x, bbSize.y, bbSize.z, mesh.color)
     }
 }
 
