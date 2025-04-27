@@ -44,7 +44,7 @@ struct Mesh : Component{
 }
 
 
-var ecs = ECScene();
+var ecs = ECScene()
 
 ecs.Component(Position.self)
 ecs.Component(Velocity.self)
@@ -96,49 +96,15 @@ let meshes = ecs.list(Mesh.self)
 // Load shaders
 //let sceneShader = LoadShaderFromMemory("""vs""", """fs""")
 let shader_root = "../sources/rendering/shaders/"
-let sceneShader = LoadShader(shader_root + "lightmap.vs", shader_root + "lightmap.fs")
-
-// Create render texture for shadow map
-var shadowMapSize: Int32 = 1024
-var shadowMap = LoadRenderTexture(shadowMapSize, shadowMapSize)
-//var shadowMap = RenderTexture2D()
-attachShadowTexture(&shadowMap, shadowMapSize, shadowMapSize)
-
-// sceneShader.locs[Int(SHADER_LOC_VECTOR_VIEW.rawValue)] = GetShaderLocation(sceneShader, "viewPos")
-// var lightDir = Vector3Normalize(Vector3Subtract(lightCamera.target, lightCamera.position))
- var lightColorNormalized = ColorNormalize(Color(r:100,g:100,b:150,a:255))
-// let lightDirLoc = GetShaderLocation(sceneShader, "lightDir")
- let lightColLoc = GetShaderLocation(sceneShader, "lightColor")
-// SetShaderValue(sceneShader, lightDirLoc, &lightDir, SHADER_UNIFORM_VEC3.rawValue)
- SetShaderValue(sceneShader, lightColLoc, &lightColorNormalized, SHADER_UNIFORM_VEC4.rawValue)
-// let ambientLoc = GetShaderLocation(sceneShader, "ambient")
-// var ambient = Vec4(x:0.1,y:0.1,z:0.1,w:1.0)
-// SetShaderValue(sceneShader, ambientLoc, &ambient, SHADER_UNIFORM_VEC4.rawValue)
- let lightVPLoc = GetShaderLocation(sceneShader, "lightVP")
- let shadowMapLoc = GetShaderLocation(sceneShader, "shadowMap")
-// let shadowMapResolutionLoc = GetShaderLocation(sceneShader, "shadowMapResolution")
-// SetShaderValue(sceneShader, shadowMapResolutionLoc, &shadowMapSize, SHADER_UNIFORM_INT.rawValue)
-
-SetShaderValueTexture(sceneShader, shadowMapLoc, shadowMap.depth)
+var sceneShader = LoadShader(shader_root + "lightmap.vs", shader_root + "lightmap.fs")
 
 
-// ground
-let planeMesh = GenMeshPlane(25.0, 25.0, 1, 1)
-let planeModel = LoadModelFromMesh(planeMesh)
-
+var shadowmap = shadowBuffer(1024,1024)
 
 while !WindowShouldClose()
 {
     let frameTime = Float(GetFrameTime())
-    BeginDrawing()
-    ClearBackground(RAYWHITE)
-
-    defer {
-        DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY) 
-        EndDrawing()
-    }      
-
-
+	
     ecs.iterateWithEntity(positions, velocities).parallelFor {
         var (entity, p, v) = $0
         p.x += v.x * frameTime                                                                                      
@@ -148,54 +114,59 @@ while !WindowShouldClose()
         positions[entity] = p
         velocities[entity] = v
     }
+	
+	
+	if IsKeyPressed(KEY_R.rawValue){
+		{
+			let newShader = LoadShader(shader_root + "lightmap.vs", shader_root + "lightmap.fs")
+			guard newShader.id > 0 else { return }
+			sceneShader = newShader
+		}()
+	}
+	
+	BeginTextureMode(shadowmap)
+        ClearBackground(RAYWHITE)
+        BeginMode3D(lightCamera)
+        
+        //rlSetMatrixProjection(MatrixOrtho(-1024,1024,-1024,1024,1,10000))
+        
+		drawScene()
 
-
-    // shadows
-    BeginTextureMode(shadowMap)
-    ClearBackground(RAYBLACK)
-    BeginMode3D(lightCamera)
-    //BeginShaderMode(depthShader)
-    rlSetCullFace(RL_CULL_FACE_FRONT.rawValue)
-
-    let lightProj = rlGetMatrixProjection()
-    let lightView = rlGetMatrixModelview()
-    let lightSpaceMatrix = MatrixMultiply(lightView, lightProj)
-
-    //planeModel.materials[0].shader = depthShader
-    
-    drawScene()
-
-    rlSetCullFace(RL_CULL_FACE_BACK.rawValue)
-    //EndShaderMode()
-    EndMode3D()
+        let matLightVP = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())
+        EndMode3D()
     EndTextureMode()
+	
+	
+    BeginDrawing()
+    ClearBackground(RAYWHITE)
+
+    defer {
+        DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY) 
+        EndDrawing()
+    }      
 
 
-    // main scene
-
-    drawShadowMap()
-
-
-    let temp = planeModel.materials[0].shader
-    defer { planeModel.materials[0].shader = temp }
-
-    BeginMode3D(camera)
-    BeginShaderMode(sceneShader)
-
-    SetShaderValueMatrix(sceneShader, lightVPLoc, lightSpaceMatrix)
-
-    var slot = 10; // Can be anything 0 to 15, but 0 will probably be taken up
-    rlActiveTextureSlot(10);
-    rlEnableTexture(shadowMap.depth.id);
-    rlSetUniform(shadowMapLoc, &slot, SHADER_UNIFORM_INT.rawValue, 1);
-
-    planeModel.materials[0].shader = sceneShader
+	
+	drawshadowmap()
     
-    drawScene()
+	BeginMode3D(camera)
+	BeginShaderMode(sceneShader)
+	
+	SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"matLightVP"),matLightVP)
+	
+	//rlActiveTextureSlot(1)
+	//rlEnableTexture(shadowmap.id)
+	//rlSetUniformSampler(GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.texture.id)
+	
+	SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
+	
+	drawScene()
 
-    EndShaderMode()
-    EndMode3D()
-
+	//rlActiveTextureSlot(1)
+	//rlDisableTexture()
+	
+	EndShaderMode()
+	EndMode3D()
 
     positions.upkeep()                                                                                       
     velocities.upkeep()                                                                                      
@@ -204,7 +175,7 @@ while !WindowShouldClose()
 CloseWindow()
 
 func drawScene(){
-    DrawModel(planeModel, Vector3(x: 0, y: -1, z: 0), 3.5, LIGHTGRAY)
+	DrawCube(Vector3(x: 0, y: -1, z: 0), 25, 1, 25, LIGHTGRAY)
 
     //NOTE: drawing must be on main thread
     var frustum = createFrustum()
@@ -220,37 +191,40 @@ func drawScene(){
     }
 }
 
-func drawShadowMap(){
+func drawshadowmap(){
     let display_size = WINDOW_SIZE.x / 5.0
-    let display_scale = display_size / Float(shadowMapSize)
-    DrawTextureEx(shadowMap.texture, Vec2(x:WINDOW_SIZE.x - display_size,y:0.0), 0.0, display_scale, RAYWHITE)
-    DrawTextureEx(shadowMap.depth, Vec2(x:WINDOW_SIZE.x - display_size,y: display_size), 0.0, display_scale, RAYWHITE)
+    let display_scale = display_size / Float(shadowmap.depth.width)
+    DrawTextureEx(shadowmap.texture, Vec2(x:WINDOW_SIZE.x - display_size,y:0.0), 0.0, display_scale, RAYWHITE)
+    DrawTextureEx(shadowmap.depth, Vec2(x:WINDOW_SIZE.x - display_size,y: display_size), 0.0, display_scale, RAYWHITE)
 }
 
+func shadowBuffer(_ width : Int32, _ height:Int32) -> RenderTexture2D {
+    var target = RenderTexture2D()
+    target.id = rlLoadFramebuffer()
+	
+    if target.id > 0 {
+        rlEnableFramebuffer(target.id)
 
-
-func attachShadowTexture(_ target: inout RenderTexture2D, _ width: Int32, _ height: Int32) {
-    //var target = RenderTexture2D()
-    
-    if target.id == 0 {
-        target.id = rlLoadFramebuffer() // Load an empty framebuffer
+        // colour component, this is basically unused but i couldnt be bothered working a fragment shader without it.
+        // let opengl do the depth calculation internally this way
+        target.texture.id = rlLoadTexture(nil, width, height, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue, 1)
         target.texture.width = width
         target.texture.height = height
-    }
+        target.texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue // encode colour as 4 8 bit floats
+        target.texture.mipmaps = 1
 
-    rlEnableFramebuffer(target.id)
+        // disable renderbuffer, use a texture instead for depth
+        target.depth.id = rlLoadTextureDepth(width, height, false)
+        target.depth.width = width
+        target.depth.height = height
+        target.depth.format = PIXELFORMAT_UNCOMPRESSED_R32.rawValue // encode depth as a single 32bit float
+        target.depth.mipmaps = 1
 
-    // Create depth texture
-    target.depth.id = rlLoadTextureDepth(width, height, false) // useRenderBuffer = false
-    target.depth.width = width
-    target.depth.height = height
-    target.depth.format = PIXELFORMAT_UNCOMPRESSED_R32.rawValue
-    target.depth.mipmaps = 1
+        // bind textures to framebuffer, note RL_ATTACHMENT_DEPTH for depth component
+        rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
+        rlFramebufferAttach(target.id, target.depth.id, RL_ATTACHMENT_DEPTH.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
 
-    // Attach depth texture to FBO
-    rlFramebufferAttach(target.id, target.depth.id, RL_ATTACHMENT_DEPTH.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
-
-    guard rlFramebufferComplete(target.id) else { return }
-
-    rlDisableFramebuffer()
+        rlDisableFramebuffer()
+    }   
+    return target
 }
