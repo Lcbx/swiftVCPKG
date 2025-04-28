@@ -38,3 +38,7 @@ let RAYWHITE = raylib.Color(r:255,g:255,b:255,a:255)
 let RAYBLACK = raylib.Color(r:0,g:0,b:0,a:255)
 let LIGHTGRAY = raylib.Color(r:100,g:100,b:100,a:255)
 let RED = raylib.Color(r:255,g:0,b:0,a:255)
+
+let PI = 3.14159265358979323846
+let DEG2RAD = PI/180.0
+let RAD2DEG = 180.0/PI

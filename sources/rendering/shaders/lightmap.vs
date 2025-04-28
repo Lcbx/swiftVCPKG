@@ -6,7 +6,7 @@ in vec3 vertexNormal;
 in vec4 vertexColor;
 
 uniform mat4 mvp; // default keyword
-uniform mat4 matLightVP;
+uniform mat4 lightVP;
 
 out vec2 fragTexCoord;
 out vec4 fragColor;
@@ -19,7 +19,7 @@ void main(){
 	vec4 vertex = vec4(vertexPosition, 1.0);
     gl_Position = mvp*vertex;
 	
-    vec4 lightSpacePos = matLightVP*vertex;
+    vec4 lightSpacePos = lightVP*vertex;
     vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
     projCoords = projCoords * 0.5 + 0.5;
 	

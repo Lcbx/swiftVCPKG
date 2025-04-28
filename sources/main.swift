@@ -9,8 +9,6 @@ import pocketpy
     print("Release")
 #endif
 
-// TODO : rewrite using this
-// https://noino.substack.com/p/raylib-graphics-shading
 
 let WINDOW_SIZE = Vec2(x:800, y:400)
 
@@ -72,7 +70,7 @@ for i in ecs.createEntities(SQUARE_N){
 }
 
 var camera = Camera(
-    position: Vec3(x:30, y: 70, z: -30),
+    position: Vec3(x:20, y: 65, z: -30),
     target: Vec3(x: 0, y: 0, z: -30),
     up: Vec3(x: 0, y: 1, z: 0),
     fovy: 60.0,
@@ -81,12 +79,12 @@ var camera = Camera(
 
 
 var lightCamera = Camera3D(
-    position: Vector3(x: -10, y: 35, z: -10),
+    position: Vector3(x: -5, y: 50, z: 5),
     target: Vector3(x: 0, y: 0, z: 0),
     up: Vector3(x: 0, y: 1, z: 0),
-    fovy: 60.0,
-    //projection: CAMERA_PERSPECTIVE.rawValue // depth buffer empty ?
-	projection: CAMERA_ORTHOGRAPHIC.rawValue
+    fovy: 50.0,
+    projection: CAMERA_PERSPECTIVE.rawValue
+	//projection: CAMERA_ORTHOGRAPHIC.rawValue
 )
 
 let positions = ecs.list(Position.self)
@@ -100,7 +98,7 @@ let shader_root = "../sources/rendering/shaders/"
 var sceneShader = LoadShader(shader_root + "lightmap.vs", shader_root + "lightmap.fs")
 
 
-var shadowmap = shadowBuffer(1024,1024)
+var shadowmap = shadowBuffer(1024,1024,withColorBuffer:true)
 
 while !WindowShouldClose()
 {
@@ -129,47 +127,46 @@ while !WindowShouldClose()
 	//rlEnableBackfaceCulling()
 	
 	BeginTextureMode(shadowmap)
-        ClearBackground(RAYWHITE)
-        BeginMode3D(lightCamera)
-		// does not help shadow acne ?
-		//rlSetCullFace(RL_CULL_FACE_FRONT.rawValue)
-        
+	rlSetClipPlanes(5, 70)
+	BeginMode3D(lightCamera)
+		ClearBackground(RAYWHITE)
+		rlSetCullFace(RL_CULL_FACE_FRONT.rawValue)
+		
+		
 		drawScene()
 		
 		// for later
-        let matLightVP = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())
+		let lightVP = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())
 		
-		//rlSetCullFace(RL_CULL_FACE_BACK.rawValue)
-        EndMode3D()
+		rlSetCullFace(RL_CULL_FACE_BACK.rawValue)
+	EndMode3D()
     EndTextureMode()
-	
-	
-    ClearBackground(RAYWHITE)
 
     defer {
         DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY) 
+		drawshadowmap()
         EndDrawing()
-    }      
-
-
-	
-	drawshadowmap()
+    }
     
+	rlSetClipPlanes(0.01, 1000)
 	BeginMode3D(camera)
+		ClearBackground(RAYWHITE)
 	
-	DrawSphere(lightCamera.position, 0.6, Color(r: 200, g: 100, b: 0, a: 255))
-	DrawLine3D(lightCamera.position, lightCamera.target, Color(r: 250, g: 50, b: 30, a: 255))
-	
-	BeginShaderMode(sceneShader)
-	
-	SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"matLightVP"),matLightVP)
-	SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
-	
-	
-	
-	drawScene()
-	
-	EndShaderMode()
+		DrawSphere(lightCamera.position, 0.6, Color(r: 200, g: 100, b: 0, a: 255))
+		DrawLine3D(lightCamera.position, lightCamera.target, Color(r: 250, g: 50, b: 30, a: 255))
+		
+		BeginShaderMode(sceneShader)
+		
+		var lightDir = Vector3Normalize(Vector3Subtract(lightCamera.position, lightCamera.target))
+		SetShaderValue(sceneShader,GetShaderLocation(sceneShader,"lightDir"),&lightDir, SHADER_UNIFORM_VEC3.rawValue)
+		SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"lightVP"),lightVP)
+		SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
+		
+		
+		
+		drawScene()
+		
+		EndShaderMode()
 	EndMode3D()
 
     positions.upkeep()                                                                                       
@@ -180,6 +177,7 @@ CloseWindow()
 
 func drawScene(){
 	DrawCube(Vector3(x: 0, y: -1, z: 0), 50, 1, 50, LIGHTGRAY)
+	DrawCube(Vector3(x: 0, y: -1, z: 0), 1, 10, 1, RED)
 
     //NOTE: drawing must be on main thread
     var frustum = createFrustum()
@@ -202,31 +200,29 @@ func drawshadowmap(){
     DrawTextureEx(shadowmap.depth, Vec2(x:WINDOW_SIZE.x - display_size,y: display_size), 0.0, display_scale, RAYWHITE)
 }
 
-func shadowBuffer(_ width : Int32, _ height:Int32) -> RenderTexture2D {
+func shadowBuffer(_ width : Int32, _ height:Int32, withColorBuffer:Bool=false) -> RenderTexture2D {
     //var target = LoadRenderTexture(width, height)
 	var target = RenderTexture2D()
     target.id = rlLoadFramebuffer()
 	
     if target.id > 0 {
         rlEnableFramebuffer(target.id)
-
-        // colour component, this is basically unused but i couldnt be bothered working a fragment shader without it.
-        // let opengl do the depth calculation internally this way
-        target.texture.id = rlLoadTexture(nil, width, height, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue, 1)
-        target.texture.width = width
+		
+		if withColorBuffer {
+			target.texture.id = rlLoadTexture(nil, width, height, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue, 1)
+			target.texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue // encode colour as 4 8 bit floats
+			target.texture.mipmaps = 1
+			rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
+        }
+		target.texture.width = width
         target.texture.height = height
-        target.texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue // encode colour as 4 8 bit floats
-        target.texture.mipmaps = 1
 
-        // disable renderbuffer, use a texture instead for depth
         target.depth.id = rlLoadTextureDepth(width, height, false)
         target.depth.width = width
         target.depth.height = height
         target.depth.format = PIXELFORMAT_UNCOMPRESSED_R32.rawValue // encode depth as a single 32bit float
         target.depth.mipmaps = 1
 
-        // bind textures to framebuffer, note RL_ATTACHMENT_DEPTH for depth component
-        rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
         rlFramebufferAttach(target.id, target.depth.id, RL_ATTACHMENT_DEPTH.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
 
         rlDisableFramebuffer()
