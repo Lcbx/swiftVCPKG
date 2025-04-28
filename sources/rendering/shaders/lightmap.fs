@@ -4,20 +4,29 @@ in vec2 fragTexCoord;
 in vec3 fragNormal;
 in vec4 fragColor;
 
-in vec2 fragShadowTexCoord;
-in float fragShadowDepth;
+in vec3 fragShadowClipSpace;
 
-uniform sampler2D texture0; // diffuse texture keyword, DrawMesh uses this
-uniform sampler2D texture_shadowmap; // custom uniform
+uniform sampler2D texture0; // diffuse texture keyword
+uniform sampler2D texture_shadowmap;
 
 out vec4 finalColor;
 
-void main(){
+
+bool insideBox(vec2 v, vec2 bottomLeft, vec2 topRight) {
+    vec2 s = step(bottomLeft, v) - step(topRight, v);
+    return bool(s.x * s.y);   
+}
+
+void main()
+{
     finalColor = fragColor * texture( texture0, fragTexCoord );
-    float shadowDepth = texture(texture_shadowmap, fragShadowTexCoord).r;
-    if(fragShadowDepth + 0.001 > shadowDepth){
-        finalColor = vec4(finalColor.rgb*.2,finalColor.a);
-    }
-	//finalColor = texture(texture_shadowmap, fragTexCoord);
-	finalColor = vec4(mix(vec3(shadowDepth), fragColor.rgb, 0.5),1);
+	
+	vec2 shadowTexCoords = fragShadowClipSpace.xy;
+	
+	if(insideBox(shadowTexCoords, vec2(0), vec2(1) ) ){
+		float fragmentDepthFromLight = fragShadowClipSpace.z;
+		float shadowMapDepth = texture(texture_shadowmap, shadowTexCoords).r;
+		float shadow = fragmentDepthFromLight > shadowMapDepth + 0.001 ? 0.5 : 1.0;
+		finalColor = vec4(vec3(shadow) * finalColor.rgb,1);
+	}
 }

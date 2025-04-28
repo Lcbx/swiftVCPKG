@@ -6,21 +6,22 @@ in vec3 vertexNormal;
 in vec4 vertexColor;
 
 uniform mat4 mvp; // default keyword
-uniform mat4 matModel; // default keyword
 uniform mat4 matLightVP;
 
 out vec2 fragTexCoord;
 out vec4 fragColor;
-out vec2 fragShadowTexCoord;
-out float fragShadowDepth;
+out vec3 fragShadowClipSpace;
 
 void main(){
-    gl_Position = mvp*vec4(vertexPosition, 1.0);
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
-    
-    vec4 worldSpace = matModel*vec4(vertexPosition, 1.0); // position of the model in the scene
-    vec4 screenSpace = matLightVP*worldSpace; // equivalent to gl_Position above but for the ligh
-    fragShadowDepth = screenSpace.z/screenSpace.w; // .z component is depth in screen space.
-    fragShadowTexCoord = (screenSpace.xy/screenSpace.w)*.5+.5; // .xy is position on the screen
+	
+	vec4 vertex = vec4(vertexPosition, 1.0);
+    gl_Position = mvp*vertex;
+	
+    vec4 lightSpacePos = matLightVP*vertex;
+    vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
+    projCoords = projCoords * 0.5 + 0.5;
+	
+	fragShadowClipSpace = projCoords;
 }

@@ -72,8 +72,8 @@ for i in ecs.createEntities(SQUARE_N){
 }
 
 var camera = Camera(
-    position: Vec3(x:30, y: 60, z: -20),
-    target: Vec3(x: 0, y: 0, z: -20),
+    position: Vec3(x:30, y: 70, z: -30),
+    target: Vec3(x: 0, y: 0, z: -30),
     up: Vec3(x: 0, y: 1, z: 0),
     fovy: 60.0,
     projection: CAMERA_PERSPECTIVE.rawValue
@@ -81,11 +81,12 @@ var camera = Camera(
 
 
 var lightCamera = Camera3D(
-    position: Vector3(x: -10, y: 400, z: -10),
+    position: Vector3(x: -10, y: 35, z: -10),
     target: Vector3(x: 0, y: 0, z: 0),
     up: Vector3(x: 0, y: 1, z: 0),
-    fovy: 50.0,
-    projection: CAMERA_ORTHOGRAPHIC.rawValue
+    fovy: 60.0,
+    //projection: CAMERA_PERSPECTIVE.rawValue // depth buffer empty ?
+	projection: CAMERA_ORTHOGRAPHIC.rawValue
 )
 
 let positions = ecs.list(Position.self)
@@ -124,20 +125,25 @@ while !WindowShouldClose()
 		}()
 	}
 	
+    BeginDrawing()
+	//rlEnableBackfaceCulling()
+	
 	BeginTextureMode(shadowmap)
         ClearBackground(RAYWHITE)
         BeginMode3D(lightCamera)
-        
-        //rlSetMatrixProjection(MatrixOrtho(-1024,1024,-1024,1024,1,10000))
+		// does not help shadow acne ?
+		//rlSetCullFace(RL_CULL_FACE_FRONT.rawValue)
         
 		drawScene()
-
+		
+		// for later
         let matLightVP = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())
+		
+		//rlSetCullFace(RL_CULL_FACE_BACK.rawValue)
         EndMode3D()
     EndTextureMode()
 	
 	
-    BeginDrawing()
     ClearBackground(RAYWHITE)
 
     defer {
@@ -150,20 +156,18 @@ while !WindowShouldClose()
 	drawshadowmap()
     
 	BeginMode3D(camera)
+	
+	DrawSphere(lightCamera.position, 0.6, Color(r: 200, g: 100, b: 0, a: 255))
+	DrawLine3D(lightCamera.position, lightCamera.target, Color(r: 250, g: 50, b: 30, a: 255))
+	
 	BeginShaderMode(sceneShader)
 	
 	SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"matLightVP"),matLightVP)
-	
-	//rlActiveTextureSlot(1)
-	//rlEnableTexture(shadowmap.id)
-	//rlSetUniformSampler(GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.texture.id)
-	
 	SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
 	
+	
+	
 	drawScene()
-
-	//rlActiveTextureSlot(1)
-	//rlDisableTexture()
 	
 	EndShaderMode()
 	EndMode3D()
@@ -175,7 +179,7 @@ while !WindowShouldClose()
 CloseWindow()
 
 func drawScene(){
-	DrawCube(Vector3(x: 0, y: -1, z: 0), 25, 1, 25, LIGHTGRAY)
+	DrawCube(Vector3(x: 0, y: -1, z: 0), 50, 1, 50, LIGHTGRAY)
 
     //NOTE: drawing must be on main thread
     var frustum = createFrustum()
@@ -199,7 +203,8 @@ func drawshadowmap(){
 }
 
 func shadowBuffer(_ width : Int32, _ height:Int32) -> RenderTexture2D {
-    var target = RenderTexture2D()
+    //var target = LoadRenderTexture(width, height)
+	var target = RenderTexture2D()
     target.id = rlLoadFramebuffer()
 	
     if target.id > 0 {
