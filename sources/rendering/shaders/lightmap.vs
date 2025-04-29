@@ -5,12 +5,14 @@ in vec2 vertexTexCoord;
 in vec3 vertexNormal;
 in vec4 vertexColor;
 
-uniform mat4 mvp; // default keyword
+uniform mat4 matModel;
+uniform mat4 mvp;
+
 uniform mat4 lightVP;
 
 out vec2 fragTexCoord;
 out vec4 fragColor;
-out vec3 fragShadowClipSpace;
+out vec4 fragShadowClipSpace;
 
 void main(){
     fragTexCoord = vertexTexCoord;
@@ -19,9 +21,5 @@ void main(){
 	vec4 vertex = vec4(vertexPosition, 1.0);
     gl_Position = mvp*vertex;
 	
-    vec4 lightSpacePos = lightVP*vertex;
-    vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
-    projCoords = projCoords * 0.5 + 0.5;
-	
-	fragShadowClipSpace = projCoords;
+    fragShadowClipSpace = lightVP*matModel*vertex;
 }

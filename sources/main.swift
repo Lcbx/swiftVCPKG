@@ -10,7 +10,7 @@ import pocketpy
 #endif
 
 
-let WINDOW_SIZE = Vec2(x:800, y:400)
+let WINDOW_SIZE = Vec2(x:1080, y:600)
 
 InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "hello world")
 SetTargetFPS(60)
@@ -70,7 +70,7 @@ for i in ecs.createEntities(SQUARE_N){
 }
 
 var camera = Camera(
-    position: Vec3(x:20, y: 65, z: -30),
+    position: Vec3(x:30, y: 70, z: -30),
     target: Vec3(x: 0, y: 0, z: -30),
     up: Vec3(x: 0, y: 1, z: 0),
     fovy: 60.0,
@@ -79,13 +79,22 @@ var camera = Camera(
 
 
 var lightCamera = Camera3D(
-    position: Vector3(x: -5, y: 50, z: 5),
-    target: Vector3(x: 0, y: 0, z: 0),
-    up: Vector3(x: 0, y: 1, z: 0),
-    fovy: 50.0,
-    projection: CAMERA_PERSPECTIVE.rawValue
-	//projection: CAMERA_ORTHOGRAPHIC.rawValue
+    position: Vec3(x: -20, y: 30, z: 5),
+    target: Vec3(x: 0, y: 0, z: 0),
+    up: Vec3(x: 0, y: 1, z: 0),
+    fovy: 90.0,
+	projection: CAMERA_ORTHOGRAPHIC.rawValue
 )
+
+let blackBar = ecs[ecs.createEntities(1).first!]
+blackBar.add(Position(x: 0, y: -1, z: 0))
+blackBar.add(Velocity(x: 10,y: 0, z: 10))
+blackBar.add(Mesh(color:RAYBLACK,
+	boundingBox:BoundingBox(
+	min: Vec3(x:-0.5, y:-20, z:-0.5),
+	max: Vec3(x:0.5, y:20, z:0.5))
+))
+
 
 let positions = ecs.list(Position.self)
 let velocities = ecs.list(Velocity.self)
@@ -122,21 +131,26 @@ while !WindowShouldClose()
 			sceneShader = newShader
 		}()
 	}
+	if IsKeyPressed(KEY_P.rawValue){
+		lightCamera.projection = (
+			lightCamera.projection == CAMERA_PERSPECTIVE.rawValue ?
+			CAMERA_ORTHOGRAPHIC.rawValue : CAMERA_PERSPECTIVE.rawValue
+		)
+	}
 	
     BeginDrawing()
 	//rlEnableBackfaceCulling()
 	
+	var lightNearFar = Vec2(x:5,y:70)
 	BeginTextureMode(shadowmap)
-	rlSetClipPlanes(5, 70)
+	rlSetClipPlanes(Double(lightNearFar.x), Double(lightNearFar.y))
 	BeginMode3D(lightCamera)
 		ClearBackground(RAYWHITE)
 		rlSetCullFace(RL_CULL_FACE_FRONT.rawValue)
 		
-		
-		drawScene()
-		
-		// for later
 		let lightVP = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())
+	
+		drawScene()
 		
 		rlSetCullFace(RL_CULL_FACE_BACK.rawValue)
 	EndMode3D()
@@ -162,8 +176,6 @@ while !WindowShouldClose()
 		SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"lightVP"),lightVP)
 		SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
 		
-		
-		
 		drawScene()
 		
 		EndShaderMode()
@@ -176,8 +188,7 @@ while !WindowShouldClose()
 CloseWindow()
 
 func drawScene(){
-	DrawCube(Vector3(x: 0, y: -1, z: 0), 50, 1, 50, LIGHTGRAY)
-	DrawCube(Vector3(x: 0, y: -1, z: 0), 1, 10, 1, RED)
+	DrawCube(Vec3(x: 0, y: -1, z: 0), 50, 1, 50, LIGHTGRAY)
 
     //NOTE: drawing must be on main thread
     var frustum = createFrustum()
@@ -210,7 +221,7 @@ func shadowBuffer(_ width : Int32, _ height:Int32, withColorBuffer:Bool=false) -
 		
 		if withColorBuffer {
 			target.texture.id = rlLoadTexture(nil, width, height, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue, 1)
-			target.texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue // encode colour as 4 8 bit floats
+			target.texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue
 			target.texture.mipmaps = 1
 			rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
         }
@@ -220,7 +231,7 @@ func shadowBuffer(_ width : Int32, _ height:Int32, withColorBuffer:Bool=false) -
         target.depth.id = rlLoadTextureDepth(width, height, false)
         target.depth.width = width
         target.depth.height = height
-        target.depth.format = PIXELFORMAT_UNCOMPRESSED_R32.rawValue // encode depth as a single 32bit float
+        target.depth.format = PIXELFORMAT_UNCOMPRESSED_R32.rawValue
         target.depth.mipmaps = 1
 
         rlFramebufferAttach(target.id, target.depth.id, RL_ATTACHMENT_DEPTH.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
