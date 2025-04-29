@@ -17,6 +17,14 @@ func RunTask( task : @escaping () -> Void) {
 	}
 }
 
+extension Array {
+	func parallelFor(execute action : (Element) -> Void ){
+		DispatchQueue.concurrentPerform( iterations:self.count ){ i in
+			action( self[i] )
+		}
+	}
+}
+
 
 
 typealias Vec2 = raylib.Vector2
@@ -29,3 +37,8 @@ let rnd_color = { return raylib.Color(r: rnd_uint8(), g: rnd_uint8(), b: rnd_uin
 let RAYWHITE = raylib.Color(r:255,g:255,b:255,a:255)
 let BLACK = raylib.Color(r:0,g:0,b:0,a:255)
 let LIGHTGRAY = raylib.Color(r:100,g:100,b:100,a:255)
+let RED = raylib.Color(r:255,g:0,b:0,a:255)
+
+let PI = 3.14159265358979323846
+let DEG2RAD = PI/180.0
+let RAD2DEG = 180.0/PI
