@@ -12,7 +12,7 @@ import pocketpy
 
 let WINDOW_SIZE = Vec2(x:1080, y:600)
 
-InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "hello world")
+InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "shadowmap example")
 SetTargetFPS(60)
 
 //FrustumTest()
@@ -89,7 +89,7 @@ var lightCamera = Camera3D(
 let blackBar = ecs[ecs.createEntities(1).first!]
 blackBar.add(Position(x: 0, y: -1, z: 0))
 blackBar.add(Velocity(x: 10,y: 0, z: 10))
-blackBar.add(Mesh(color:RAYBLACK,
+blackBar.add(Mesh(color:BLACK,
 	boundingBox:BoundingBox(
 	min: Vec3(x:-0.5, y:-20, z:-0.5),
 	max: Vec3(x:0.5, y:20, z:0.5))
