@@ -35,7 +35,7 @@ let rnd_uint8 = { return UInt8(raylib.GetRandomValue(0, 255)) }
 let rnd_color = { return raylib.Color(r: rnd_uint8(), g: rnd_uint8(), b: rnd_uint8(), a: 255) }
 
 let RAYWHITE = raylib.Color(r:255,g:255,b:255,a:255)
-let RAYBLACK = raylib.Color(r:0,g:0,b:0,a:255)
+let BLACK = raylib.Color(r:0,g:0,b:0,a:255)
 let LIGHTGRAY = raylib.Color(r:100,g:100,b:100,a:255)
 let RED = raylib.Color(r:255,g:0,b:0,a:255)
 

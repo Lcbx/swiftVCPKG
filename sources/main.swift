@@ -12,7 +12,7 @@ import pocketpy
 
 let WINDOW_SIZE = Vec2(x:1080, y:600)
 
-InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "hello world")
+InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "shadowmap example")
 SetTargetFPS(60)
 
 //FrustumTest()
