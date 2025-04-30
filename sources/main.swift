@@ -10,14 +10,14 @@ import pocketpy
 #endif
 
 
-let WINDOW_SIZE = Vec2(x:1080, y:600)
+let WINDOW_SIZE = Vec2(x:1800, y:900)
 
 InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "shadowmap example")
 SetTargetFPS(60)
 
 //FrustumTest()
 
-let SQUARE_N : Int = 10
+let SQUARE_N : Int = 15
 let SPACE_SIZE : Int32 = 30
 
 struct Position : Component {
@@ -52,20 +52,13 @@ let positions = ecs.list(Position.self)
 let velocities = ecs.list(Velocity.self)
 let meshes = ecs.list(Mesh.self)
 
-// TODO: it seems iteration through components is broken
-// crash when no velocity is added
 let blackBar = ecs[ecs.createEntities(1).first!]
 blackBar.add(Position(x: 0, y: -1, z: 0))
-blackBar.add(Velocity(x: 0,y: 0, z: 0))
 blackBar.add(Mesh(color:BLACK,
 	boundingBox:BoundingBox(
 	min: Vec3(x:-0.5, y:-20, z:-0.5),
 	max: Vec3(x:0.5, y:20, z:0.5))
 ))
-print("pos", blackBar.hasComponents(positions.componentMask))
-print("vel", blackBar.hasComponents(velocities.componentMask))
-print("mesh", blackBar.hasComponents(meshes.componentMask))
-print("blackBar end")
 
 
 for i in ecs.createEntities(SQUARE_N){
@@ -111,8 +104,10 @@ let shader_root = "../sources/rendering/shaders/"
 var sceneShader : Shader
 
 var shadowmap = shadowBuffer(1024,1024,colorBufferFormat:PIXELFORMAT_UNCOMPRESSED_R32)
-SetTextureFilter(shadowmap.texture, TEXTURE_FILTER_BILINEAR.rawValue);
-SetTextureFilter(shadowmap.depth, TEXTURE_FILTER_BILINEAR.rawValue);
+GenTextureMipmaps(&shadowmap.texture);
+GenTextureMipmaps(&shadowmap.depth);
+SetTextureFilter(shadowmap.texture, TEXTURE_FILTER_TRILINEAR.rawValue);
+SetTextureFilter(shadowmap.depth, TEXTURE_FILTER_TRILINEAR.rawValue);
 var shadowShader : Shader
 
 	
@@ -157,7 +152,7 @@ while !WindowShouldClose()
 	let scrollspeed = Float(3.0);
 	let mw = scrollspeed * GetMouseWheelMove()
 	if camera.position.y > scrollspeed + 0.5 || mw > 0.0 {
-		camera.position = Vector3Add(camera.position, Vector3Multiply(Vector3Normalize(Vec3(x:23, y: 70, z: -23)), Vec3(x:mw,y:mw,z:mw)))
+		camera.position = Vector3Add(camera.position, Vector3Multiply(Vector3Normalize(Vec3(x:24, y: 70, z: -24)), Vec3(x:mw,y:mw,z:mw)))
 	}
 	
 	
