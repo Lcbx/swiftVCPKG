@@ -48,6 +48,24 @@ ecs.Component(Position.self)
 ecs.Component(Velocity.self)
 ecs.Component(Mesh.self)
 
+let positions = ecs.list(Position.self)
+let velocities = ecs.list(Velocity.self)
+let meshes = ecs.list(Mesh.self)
+
+// TODO: it seems iteration through components is broken
+// crash when no velocity is added
+let blackBar = ecs[ecs.createEntities(1).first!]
+blackBar.add(Position(x: 0, y: -1, z: 0))
+blackBar.add(Velocity(x: 0,y: 0, z: 0))
+blackBar.add(Mesh(color:BLACK,
+	boundingBox:BoundingBox(
+	min: Vec3(x:-0.5, y:-20, z:-0.5),
+	max: Vec3(x:0.5, y:20, z:0.5))
+))
+print("pos", blackBar.hasComponents(positions.componentMask))
+print("vel", blackBar.hasComponents(velocities.componentMask))
+print("mesh", blackBar.hasComponents(meshes.componentMask))
+print("blackBar end")
 
 
 for i in ecs.createEntities(SQUARE_N){
@@ -71,7 +89,7 @@ for i in ecs.createEntities(SQUARE_N){
 
 var camera = Camera(
     position: Vec3(x:30, y: 70, z: -30),
-    target: Vec3(x: 0, y: 0, z: -30),
+    target: Vec3(x:0, y:0, z:0),
     up: Vec3(x: 0, y: 1, z: 0),
     fovy: 60.0,
     projection: CAMERA_PERSPECTIVE.rawValue
@@ -79,36 +97,34 @@ var camera = Camera(
 
 
 var lightCamera = Camera3D(
-    position: Vec3(x: -20, y: 30, z: 5),
+    position: Vec3(x: -10, y: 50, z: 10),
     target: Vec3(x: 0, y: 0, z: 0),
     up: Vec3(x: 0, y: 1, z: 0),
     fovy: 90.0,
 	projection: CAMERA_ORTHOGRAPHIC.rawValue
 )
 
-let blackBar = ecs[ecs.createEntities(1).first!]
-blackBar.add(Position(x: 0, y: -1, z: 0))
-blackBar.add(Velocity(x: 10,y: 0, z: 10))
-blackBar.add(Mesh(color:RAYBLACK,
-	boundingBox:BoundingBox(
-	min: Vec3(x:-0.5, y:-20, z:-0.5),
-	max: Vec3(x:0.5, y:20, z:0.5))
-))
-
-
-let positions = ecs.list(Position.self)
-let velocities = ecs.list(Velocity.self)
-let meshes = ecs.list(Mesh.self)
-
 
 // Load shaders
 //let sceneShader = LoadShaderFromMemory("""vs""", """fs""")
 let shader_root = "../sources/rendering/shaders/"
-var sceneShader = LoadShader(shader_root + "lightmap.vs", shader_root + "lightmap.fs")
+var sceneShader : Shader
 
+var shadowmap = shadowBuffer(1024,1024,colorBufferFormat:PIXELFORMAT_UNCOMPRESSED_R32)
+SetTextureFilter(shadowmap.texture, TEXTURE_FILTER_BILINEAR.rawValue);
+SetTextureFilter(shadowmap.depth, TEXTURE_FILTER_BILINEAR.rawValue);
+var shadowShader : Shader
 
-var shadowmap = shadowBuffer(1024,1024,withColorBuffer:true)
+	
+func LoadShaders() -> (Shader, Shader){
+	(
+		LoadShader(shader_root + "lightmap.vs", shader_root + "lightmap.fs"),
+		LoadShader(shader_root + "shadow.vs", shader_root + "shadow.fs"),
+	)
+}
 
+(sceneShader, shadowShader) = LoadShaders()
+ 
 while !WindowShouldClose()
 {
     let frameTime = Float(GetFrameTime())
@@ -126,9 +142,10 @@ while !WindowShouldClose()
 	
 	if IsKeyPressed(KEY_R.rawValue){
 		{
-			let newShader = LoadShader(shader_root + "lightmap.vs", shader_root + "lightmap.fs")
-			guard newShader.id > 0 else { return }
-			sceneShader = newShader
+			let newShaders = LoadShaders()
+			guard newShaders.0.id > 0 && newShaders.1.id > 0 else { return }
+			sceneShader = newShaders.0
+			shadowShader = newShaders.1
 		}()
 	}
 	if IsKeyPressed(KEY_P.rawValue){
@@ -137,24 +154,39 @@ while !WindowShouldClose()
 			CAMERA_ORTHOGRAPHIC.rawValue : CAMERA_PERSPECTIVE.rawValue
 		)
 	}
+	let scrollspeed = Float(3.0);
+	let mw = scrollspeed * GetMouseWheelMove()
+	if camera.position.y > scrollspeed + 0.5 || mw > 0.0 {
+		camera.position = Vector3Add(camera.position, Vector3Multiply(Vector3Normalize(Vec3(x:23, y: 70, z: -23)), Vec3(x:mw,y:mw,z:mw)))
+	}
+	
 	
     BeginDrawing()
 	//rlEnableBackfaceCulling()
 	
-	var lightNearFar = Vec2(x:5,y:70)
+	var lightNearFar = Vec2(x:5,y:100)
 	BeginTextureMode(shadowmap)
 	rlSetClipPlanes(Double(lightNearFar.x), Double(lightNearFar.y))
 	BeginMode3D(lightCamera)
+		BeginShaderMode(shadowShader)
 		ClearBackground(RAYWHITE)
 		rlSetCullFace(RL_CULL_FACE_FRONT.rawValue)
 		
 		let lightVP = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())
+		var lightDir = Vector3Normalize(Vector3Subtract(lightCamera.target, lightCamera.position))
 	
 		drawScene()
 		
 		rlSetCullFace(RL_CULL_FACE_BACK.rawValue)
+		EndShaderMode()
 	EndMode3D()
     EndTextureMode()
+	
+	// avoid spam
+	SetTraceLogLevel(LOG_WARNING.rawValue)
+	GenTextureMipmaps(&shadowmap.texture);
+	GenTextureMipmaps(&shadowmap.depth);
+	SetTraceLogLevel(LOG_INFO.rawValue)
 
     defer {
         DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY) 
@@ -171,10 +203,11 @@ while !WindowShouldClose()
 		
 		BeginShaderMode(sceneShader)
 		
-		var lightDir = Vector3Normalize(Vector3Subtract(lightCamera.position, lightCamera.target))
+		SetShaderValue(sceneShader,GetShaderLocation(shadowShader,"lightDir"),&lightDir, SHADER_UNIFORM_VEC3.rawValue)
 		SetShaderValue(sceneShader,GetShaderLocation(sceneShader,"lightDir"),&lightDir, SHADER_UNIFORM_VEC3.rawValue)
 		SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"lightVP"),lightVP)
 		SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
+		SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap2"),shadowmap.texture)
 		
 		drawScene()
 		
@@ -211,22 +244,50 @@ func drawshadowmap(){
     DrawTextureEx(shadowmap.depth, Vec2(x:WINDOW_SIZE.x - display_size,y: display_size), 0.0, display_scale, RAYWHITE)
 }
 
-func shadowBuffer(_ width : Int32, _ height:Int32, withColorBuffer:Bool=false) -> RenderTexture2D {
+/*
+typedef enum {
+    RL_PIXELFORMAT_UNCOMPRESSED_GRAYSCALE = 1,     // 8 bit per pixel (no alpha)
+    RL_PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA,        // 8*2 bpp (2 channels)
+    RL_PIXELFORMAT_UNCOMPRESSED_R5G6B5,            // 16 bpp
+    RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8,            // 24 bpp
+    RL_PIXELFORMAT_UNCOMPRESSED_R5G5B5A1,          // 16 bpp (1 bit alpha)
+    RL_PIXELFORMAT_UNCOMPRESSED_R4G4B4A4,          // 16 bpp (4 bit alpha)
+    RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,          // 32 bpp
+    RL_PIXELFORMAT_UNCOMPRESSED_R32,               // 32 bpp (1 channel - float)
+    RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32,         // 32*3 bpp (3 channels - float)
+    RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32,      // 32*4 bpp (4 channels - float)
+    RL_PIXELFORMAT_UNCOMPRESSED_R16,               // 16 bpp (1 channel - half float)
+    RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16,         // 16*3 bpp (3 channels - half float)
+    RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16A16,      // 16*4 bpp (4 channels - half float)
+    RL_PIXELFORMAT_COMPRESSED_DXT1_RGB,            // 4 bpp (no alpha)
+    RL_PIXELFORMAT_COMPRESSED_DXT1_RGBA,           // 4 bpp (1 bit alpha)
+    RL_PIXELFORMAT_COMPRESSED_DXT3_RGBA,           // 8 bpp
+    RL_PIXELFORMAT_COMPRESSED_DXT5_RGBA,           // 8 bpp
+    RL_PIXELFORMAT_COMPRESSED_ETC1_RGB,            // 4 bpp
+    RL_PIXELFORMAT_COMPRESSED_ETC2_RGB,            // 4 bpp
+    RL_PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA,       // 8 bpp
+    RL_PIXELFORMAT_COMPRESSED_PVRT_RGB,            // 4 bpp
+    RL_PIXELFORMAT_COMPRESSED_PVRT_RGBA,           // 4 bpp
+    RL_PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA,       // 8 bpp
+    RL_PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA        // 2 bpp
+} rlPixelFormat;
+*/
+func shadowBuffer(_ width : Int32, _ height:Int32, colorBufferFormat:PixelFormat?=nil) -> RenderTexture2D {
     //var target = LoadRenderTexture(width, height)
 	var target = RenderTexture2D()
     target.id = rlLoadFramebuffer()
 	
     if target.id > 0 {
         rlEnableFramebuffer(target.id)
-		
-		if withColorBuffer {
-			target.texture.id = rlLoadTexture(nil, width, height, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue, 1)
-			target.texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8.rawValue
-			target.texture.mipmaps = 1
-			rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
-        }
 		target.texture.width = width
         target.texture.height = height
+		
+		if let colorFormat = colorBufferFormat {
+			target.texture.format = colorFormat.rawValue
+			target.texture.mipmaps = 1
+			target.texture.id = rlLoadTexture(nil, width, height, colorFormat.rawValue, target.texture.mipmaps)
+			rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
+        }
 
         target.depth.id = rlLoadTextureDepth(width, height, false)
         target.depth.width = width

@@ -25,6 +25,8 @@ if(MSVC)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
+
+
 project(SwiftEngine LANGUAGES Swift CXX C)
 set(CMAKE_EXE_LINKER_FLAGS_DISTRIBUTION "${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
 
@@ -36,6 +38,7 @@ add_executable(swiftEngine ${SRC_FILES})
 target_compile_options(swiftEngine PRIVATE -cxx-interoperability-mode=default)
 
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
+  # -sanitize=address not supported on windows
   target_compile_options(swiftEngine PRIVATE -g -Onone -D DEBUG)
 endif()
 

@@ -38,14 +38,14 @@ class ECScene {
         let typeId = TypeId(type)
         let componentId = typeIdToComponentId[typeId]
         guard componentId == nil else { return }
-        typeIdToComponentId[typeId] = ComponentId(typeIdToComponentId.count)
+        typeIdToComponentId[typeId] = ComponentId(storages.count)
         type.typeId = typeId
-        let storage = ComponentSet<T>() as ComponentStorage
-        addStorage(typeId, storage)
+        var storage = ComponentSet<T>() as ComponentStorage
+        addStorage(typeId, &storage)
     }
 
-    private func addStorage(_ typeId:TypeId, _ storage:ComponentStorage){
-        storage.setComponentMask(1 << storages.count)
+    private func addStorage(_ typeId:TypeId, _ storage: inout ComponentStorage){
+        storage.componentMask = 1 << storages.count
         storage.setEntityCount(maxEntities)
         storages.append(storage)
     }
@@ -62,10 +62,11 @@ class ECScene {
         let storage = storages[Int(componentId)] as! ComponentSet<T>
         entityHasComponent[entity] |= storage.componentMask
         storage.add( (entity, component) )
+		print(entity, entityHasComponent[entity])
     }
 
     public func hasComponents(_ entity : Entity, _ mask : ComponentMask ) -> Bool{
-        return entityHasComponent[entity] & mask != 0
+        return (entityHasComponent[entity] & mask) != 0
     }
 
     func deleteEntity(_ entity:Entity){
@@ -116,8 +117,8 @@ extension ECScene {
     {
      let mask = t.componentMask | u.componentMask
      return t.iterateWithEntity()
-         .filter{ self.hasComponents($0.entity, mask) }
-         .map({ ($0.entity, $0.component, u[$0.entity]) })
+         .filter { self.hasComponents($0.entity, mask) }
+         .map { ($0.entity, $0.component, u[$0.entity]) }
     }
 
     func iterate<T : Component, U : Component>(
@@ -127,8 +128,8 @@ extension ECScene {
     {
      let mask = t.componentMask | u.componentMask
      return t.iterateWithEntity()
-         .filter{ self.hasComponents($0.entity, mask) }
-         .map({ ($0.component, u[$0.entity]) })
+         .filter { self.hasComponents($0.entity, mask) }
+         .map { ($0.component, u[$0.entity]) }
     }
 
 }
