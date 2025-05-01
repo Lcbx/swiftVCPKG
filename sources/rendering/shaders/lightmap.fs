@@ -19,7 +19,7 @@ bool between(vec2 v, vec2 bottomLeft, vec2 topRight) {
 }
 
 float random(vec2 co) {
-    return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453);
+    return fract(dot(co, vec2(3,8)) * dot(co.yx, vec2(7,5)) * 0.03);
 }
 
 void main()
@@ -34,6 +34,7 @@ void main()
     if (between(shadowTexCoords, vec2(0.0), vec2(1.0))) {
         float fragmentDepth = projCoords.z;
         float occluderDepth = texture(texture_shadowmap, shadowTexCoords).r;
+		float noise = random(gl_FragCoord.xy);
 		
 		//float NDotL = dot(fragNormal, lightDir);
 		//float bias = 0.001 * (1.5 - NDotL);
@@ -41,28 +42,38 @@ void main()
 		float occlusionDistance = fragmentDepth - occluderDepth;
 		//occlusionDistance = fragmentDepth - (occluderDepth + bias);
 		
-		float mipLevel = occlusionDistance * 8.0;
+		if (occlusionDistance < 0.005) return;
 		
+		float mipLevel = occlusionDistance * 12;
+		mipLevel = min(mipLevel, 2);
+		float noiseStrength = 0.6;
+		mipLevel *= (1.0 + noise * noiseStrength - noiseStrength);
+				
 		float mean = textureLod(texture_shadowmap, shadowTexCoords, mipLevel).r;
 		float meanSq = textureLod(texture_shadowmap2, shadowTexCoords, mipLevel).r;
-		
-		//mean -= bias;
 		
         float variance = max(meanSq - mean * mean, 0.00002);
         float d = fragmentDepth - mean;
         float p = variance / (variance + d * d);
 		
-		//p = occlusionDistance < 0 ? 1.0 : 0.5;
-		
 		// combat light bleeding
-		p = (p - 0.2) / (1.0 - 0.2);
+		//float factor = 0.2;
+		//p = (p - factor) / (1.0 - factor);
 		
-		float noiseStrength = 0.15;
-		float noise = random(gl_FragCoord.xy) * noiseStrength;
-		p = p - noiseStrength + noise < 0.1 ? .5 : 1.0;
+		noiseStrength = 0.5;
+		
+		p = smoothstep(0.5, 0., p);
+		p *= (1.0 + noise * noiseStrength);
+		p = clamp(p, 0, 1);
+		p = 1.0 - p;
+		p = mix(0.5, 1., p);
 		
 		//finalColor.rgb = fragNormal;
 		finalColor.rgb *= p;
+		//finalColor.rgb *= noise;
+		
+		//if (occlusionDistance < 0.005) return;
+		//finalColor.rgb *= 0.5;
     }
 	
 	
