@@ -132,11 +132,8 @@ func FrustumTest(){
 
         EndMode3D()
 
-        positions.upkeep()                                                                                       
-        velocities.upkeep()                                                                                      
-        meshes.upkeep()
+        //positions.upkeep()                                                                                       
+        //velocities.upkeep()                                                                                      
+        //meshes.upkeep()
     }
-
-
-    print("done")
 }
