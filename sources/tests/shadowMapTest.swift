@@ -93,11 +93,10 @@ func ShadowMapTest(){
 	let shader_root = "../sources/rendering/shaders/"
 	var sceneShader : Shader
 
-	var shadowmap = shadowBuffer(1024,1024,colorBufferFormat:PIXELFORMAT_UNCOMPRESSED_R32)
+	var shadowmap = //LoadRenderTexture(1024,1024)
+		shadowBuffer(1024,1024, colorBufferFormat:PIXELFORMAT_UNCOMPRESSED_R16G16B16)
 	GenTextureMipmaps(&shadowmap.texture);
-	GenTextureMipmaps(&shadowmap.depth);
 	SetTextureFilter(shadowmap.texture, TEXTURE_FILTER_TRILINEAR.rawValue);
-	SetTextureFilter(shadowmap.depth, TEXTURE_FILTER_TRILINEAR.rawValue);
 	var shadowShader : Shader
 
 		
@@ -170,7 +169,6 @@ func ShadowMapTest(){
 		// avoid spam
 		SetTraceLogLevel(LOG_WARNING.rawValue)
 		GenTextureMipmaps(&shadowmap.texture);
-		GenTextureMipmaps(&shadowmap.depth);
 		SetTraceLogLevel(LOG_INFO.rawValue)
 
 		defer {
@@ -195,8 +193,9 @@ func ShadowMapTest(){
 			SetShaderValue(sceneShader,GetShaderLocation(sceneShader,"cameraNearFar"),&cameraNearFar, SHADER_UNIFORM_VEC2.rawValue)
 			SetShaderValue(sceneShader,GetShaderLocation(sceneShader,"lightDir"),&lightDir, SHADER_UNIFORM_VEC3.rawValue)
 			SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"lightVP"),lightVP)
-			SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
-			SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap2"),shadowmap.texture)
+			
+			SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.texture)
+			SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap2"),shadowmap.depth)
 			
 			drawScene()
 			
@@ -236,31 +235,31 @@ func ShadowMapTest(){
 
 	/*
 	typedef enum {
-		RL_PIXELFORMAT_UNCOMPRESSED_GRAYSCALE = 1,     // 8 bit per pixel (no alpha)
-		RL_PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA,        // 8*2 bpp (2 channels)
-		RL_PIXELFORMAT_UNCOMPRESSED_R5G6B5,            // 16 bpp
-		RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8,            // 24 bpp
-		RL_PIXELFORMAT_UNCOMPRESSED_R5G5B5A1,          // 16 bpp (1 bit alpha)
-		RL_PIXELFORMAT_UNCOMPRESSED_R4G4B4A4,          // 16 bpp (4 bit alpha)
-		RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,          // 32 bpp
-		RL_PIXELFORMAT_UNCOMPRESSED_R32,               // 32 bpp (1 channel - float)
-		RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32,         // 32*3 bpp (3 channels - float)
-		RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32,      // 32*4 bpp (4 channels - float)
-		RL_PIXELFORMAT_UNCOMPRESSED_R16,               // 16 bpp (1 channel - half float)
-		RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16,         // 16*3 bpp (3 channels - half float)
-		RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16A16,      // 16*4 bpp (4 channels - half float)
-		RL_PIXELFORMAT_COMPRESSED_DXT1_RGB,            // 4 bpp (no alpha)
-		RL_PIXELFORMAT_COMPRESSED_DXT1_RGBA,           // 4 bpp (1 bit alpha)
-		RL_PIXELFORMAT_COMPRESSED_DXT3_RGBA,           // 8 bpp
-		RL_PIXELFORMAT_COMPRESSED_DXT5_RGBA,           // 8 bpp
-		RL_PIXELFORMAT_COMPRESSED_ETC1_RGB,            // 4 bpp
-		RL_PIXELFORMAT_COMPRESSED_ETC2_RGB,            // 4 bpp
-		RL_PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA,       // 8 bpp
-		RL_PIXELFORMAT_COMPRESSED_PVRT_RGB,            // 4 bpp
-		RL_PIXELFORMAT_COMPRESSED_PVRT_RGBA,           // 4 bpp
-		RL_PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA,       // 8 bpp
-		RL_PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA        // 2 bpp
-	} rlPixelFormat;
+		PIXELFORMAT_UNCOMPRESSED_GRAYSCALE = 1, // 8 bit per pixel (no alpha)
+		PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA,    // 8*2 bpp (2 channels)
+		PIXELFORMAT_UNCOMPRESSED_R5G6B5,        // 16 bpp
+		PIXELFORMAT_UNCOMPRESSED_R8G8B8,        // 24 bpp
+		PIXELFORMAT_UNCOMPRESSED_R5G5B5A1,      // 16 bpp (1 bit alpha)
+		PIXELFORMAT_UNCOMPRESSED_R4G4B4A4,      // 16 bpp (4 bit alpha)
+		PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,      // 32 bpp
+		PIXELFORMAT_UNCOMPRESSED_R32,           // 32 bpp (1 channel - float)
+		PIXELFORMAT_UNCOMPRESSED_R32G32B32,     // 32*3 bpp (3 channels - float)
+		PIXELFORMAT_UNCOMPRESSED_R32G32B32A32,  // 32*4 bpp (4 channels - float)
+		PIXELFORMAT_UNCOMPRESSED_R16,           // 16 bpp (1 channel - half float)
+		PIXELFORMAT_UNCOMPRESSED_R16G16B16,     // 16*3 bpp (3 channels - half float)
+		PIXELFORMAT_UNCOMPRESSED_R16G16B16A16,  // 16*4 bpp (4 channels - half float)
+		PIXELFORMAT_COMPRESSED_DXT1_RGB,        // 4 bpp (no alpha)
+		PIXELFORMAT_COMPRESSED_DXT1_RGBA,       // 4 bpp (1 bit alpha)
+		PIXELFORMAT_COMPRESSED_DXT3_RGBA,       // 8 bpp
+		PIXELFORMAT_COMPRESSED_DXT5_RGBA,       // 8 bpp
+		PIXELFORMAT_COMPRESSED_ETC1_RGB,        // 4 bpp
+		PIXELFORMAT_COMPRESSED_ETC2_RGB,        // 4 bpp
+		PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA,   // 8 bpp
+		PIXELFORMAT_COMPRESSED_PVRT_RGB,        // 4 bpp
+		PIXELFORMAT_COMPRESSED_PVRT_RGBA,       // 4 bpp
+		PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA,   // 8 bpp
+		PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA    // 2 bpp
+	} PixelFormat;
 	*/
 	func shadowBuffer(_ width : Int32, _ height:Int32, colorBufferFormat:PixelFormat?=nil) -> RenderTexture2D {
 		//var target = LoadRenderTexture(width, height)
@@ -277,6 +276,7 @@ func ShadowMapTest(){
 				target.texture.mipmaps = 1
 				target.texture.id = rlLoadTexture(nil, width, height, colorFormat.rawValue, target.texture.mipmaps)
 				rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
+				rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL1.rawValue, RL_ATTACHMENT_TEXTURE2D.rawValue, 0)
 			}
 
 			target.depth.id = rlLoadTextureDepth(width, height, false)

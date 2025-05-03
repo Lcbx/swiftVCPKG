@@ -22,6 +22,10 @@ float random(vec2 co) {
     return fract(dot(co, vec2(3,8)) * dot(co.yx, vec2(7,5)) * 0.03);
 }
 
+float depthFromEVSM(float f){
+	return log2(f)/40.0;
+}
+
 void main()
 {
     finalColor = fragColor * texture(texture0, fragTexCoord);
@@ -36,34 +40,36 @@ void main()
 	float noise = random(gl_FragCoord.xy);
 	
 	float fragmentDepth = projCoords.z;
-	float occluderDepth = texture(texture_shadowmap, shadowTexCoords).r;
+	float occluderDepth = texture(texture_shadowmap2, shadowTexCoords).r;
 	
+	float NDotL = dot(fragNormal, lightDir);
+	float bias = 0.001 * (1.5 - NDotL);
+	float occlusionDistance = fragmentDepth - (occluderDepth + bias);
 	
-	//float NDotL = dot(fragNormal, lightDir);
-	//float bias = 0.001 * (1.5 - NDotL);
-	float occlusionDistance = fragmentDepth - occluderDepth;
-	//occlusionDistance = fragmentDepth - (occluderDepth + bias);
+    if (occlusionDistance < 0.0) return;
 	
-    if (occlusionDistance < 0.005) return;
+	float mipLevel = occlusionDistance * 5.0;
+	float size     = float(textureSize(texture_shadowmap, 0).x);
+	mipLevel = clamp(mipLevel, 0.2, log2(size));
+	//float noiseStrength = 0.3;
+	//mipLevel *= (1.0 + noise * noiseStrength - noiseStrength);
 	
-	float mipLevel = occlusionDistance * 12;
-	mipLevel = min(mipLevel, 3);
-	float noiseStrength = 0.6;
-	mipLevel *= (1.0 + noise * noiseStrength - noiseStrength);
-			
-	float mean = textureLod(texture_shadowmap, shadowTexCoords, mipLevel).r;
-	float meanSq = textureLod(texture_shadowmap2, shadowTexCoords, mipLevel).r;
+	vec3 M = textureLod(texture_shadowmap, shadowTexCoords, mipLevel).rgb;
+	float mean = M.r,
+		  meanSq = M.g,
+		  lightIntensity = M.b; // TODO
 	
 	float variance = max(meanSq - mean*mean, 0.00002);
-    variance = min(variance, (occlusionDistance) * (1 + occlusionDistance));
 	float d = fragmentDepth - mean;
 	float p = variance / (variance + d * d);
 	
-	p = smoothstep(0.5, 0., p);
-	p = clamp(p, 0, 1);
+	p = smoothstep(0.5, 0.0, p);
+	//p += noise * 0.5;
+	p = clamp(p, 0.0, 1.0);
 	
 	float p_lit = 1.0 - p;
-	p_lit = mix(0.5, 1., p_lit);
+	p_lit = mix(0.5, 1.0, p_lit);
 	
 	finalColor.rgb *= p_lit;
+	//finalColor.rgb *= p;
 }
