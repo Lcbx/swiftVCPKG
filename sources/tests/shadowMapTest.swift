@@ -148,9 +148,10 @@ func ShadowMapTest(){
 		
 		BeginDrawing()
 		
-		var lightNearFar = Vec2(x:5,y:100)
 		BeginTextureMode(shadowmap)
+		var lightNearFar = Vec2(x:5,y:100)
 		rlSetClipPlanes(Double(lightNearFar.x), Double(lightNearFar.y))
+		SetShaderValue(shadowShader,GetShaderLocation(shadowShader,"lightNearFar"),&lightNearFar, SHADER_UNIFORM_VEC2.rawValue)
 		BeginMode3D(lightCamera)
 			BeginShaderMode(shadowShader)
 			ClearBackground(RAYWHITE)
@@ -179,7 +180,8 @@ func ShadowMapTest(){
 			EndDrawing()
 		}
 		
-		rlSetClipPlanes(0.01, 1000)
+		var cameraNearFar = Vec2(x:0.01,y:1000)
+		rlSetClipPlanes(Double(cameraNearFar.x), Double(cameraNearFar.y))
 		BeginMode3D(camera)
 			ClearBackground(RAYWHITE)
 			DrawGrid(25, 2.0)
@@ -189,7 +191,8 @@ func ShadowMapTest(){
 			
 			BeginShaderMode(sceneShader)
 			
-			SetShaderValue(sceneShader,GetShaderLocation(shadowShader,"lightDir"),&lightDir, SHADER_UNIFORM_VEC3.rawValue)
+			SetShaderValue(sceneShader,GetShaderLocation(sceneShader,"lightNearFar"),&lightNearFar, SHADER_UNIFORM_VEC2.rawValue)
+			SetShaderValue(sceneShader,GetShaderLocation(sceneShader,"cameraNearFar"),&cameraNearFar, SHADER_UNIFORM_VEC2.rawValue)
 			SetShaderValue(sceneShader,GetShaderLocation(sceneShader,"lightDir"),&lightDir, SHADER_UNIFORM_VEC3.rawValue)
 			SetShaderValueMatrix(sceneShader,GetShaderLocation(sceneShader,"lightVP"),lightVP)
 			SetShaderValueTexture(sceneShader,GetShaderLocation(sceneShader,"texture_shadowmap"),shadowmap.depth)
