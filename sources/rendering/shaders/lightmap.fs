@@ -32,6 +32,9 @@ void main()
     vec2 shadowTexCoords = projCoords.xy;
 
     if (between(shadowTexCoords, vec2(0.0), vec2(1.0))) {
+		
+		// TODO: linearize distances using camera near/far planes
+		
         float fragmentDepth = projCoords.z;
         float occluderDepth = texture(texture_shadowmap, shadowTexCoords).r;
 		float noise = random(gl_FragCoord.xy);

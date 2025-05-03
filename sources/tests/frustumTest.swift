@@ -3,6 +3,7 @@ import raylib
 
 
 func FrustumTest(){
+	SetWindowTitle("Frustum culling example"); 
     SetTargetFPS(60)
 
     let SQUARE_N = 1000
@@ -19,8 +20,6 @@ func FrustumTest(){
         public var y : Float
         public var z : Float
     }
-
-
     struct Mesh : Component{
         static var typeId = TypeId(Self.self)
         public var color : Color
@@ -28,13 +27,11 @@ func FrustumTest(){
         //public var data : Model
     }
 
-
     var ecs = ECScene();
 
     ecs.Component(Position.self)
     ecs.Component(Velocity.self)
     ecs.Component(Mesh.self)
-
 
 
     for i in ecs.createEntities(SQUARE_N){
@@ -76,7 +73,7 @@ func FrustumTest(){
     let velocities = ecs.list(Velocity.self)
     let meshes = ecs.list(Mesh.self)
 
-
+	var useMainCamera = true;
     while !WindowShouldClose()
     {
         let frameTime = Float(GetFrameTime())
@@ -84,7 +81,8 @@ func FrustumTest(){
         ClearBackground(RAYWHITE)
 
         defer {
-            DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY) 
+            DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY)
+			DrawText("press S to switch viewpoints", 10, 30, 20, LIGHTGRAY)
             EndDrawing()
         }      
 
@@ -101,19 +99,22 @@ func FrustumTest(){
 
         BeginMode3D(camera2)
         var frustum = createFrustum()
-        EndMode3D()
+        
+		if IsKeyPressed(KEY_S.rawValue) {
+			useMainCamera = !useMainCamera;
+		}
+		if useMainCamera {
+			EndMode3D()
 
-        //UpdateCamera(&camera, CAMERA_FIRST_PERSON.rawValue)
-        BeginMode3D(camera)
-        DrawGrid(25, 2.0);
+			BeginMode3D(camera)
+			
+			DrawSphere(camera2.position, 0.3, Color(r: 255, g: 255, b: 0, a: 255))
+			DrawLine3D(camera2.position, camera2.target, Color(r: 200, g: 100, b: 100, a: 255))
+		}
+		//DrawGrid(25, 2.0)
         
-        DrawSphere(camera2.position, 0.3, Color(r: 255, g: 255, b: 0, a: 255))
-        DrawLine3D(camera2.position, camera2.target, Color(r: 200, g: 100, b: 100, a: 255))
-        
-        //BeginMode3D(camera2)
 
         //NOTE: drawing must be on main thread
-        //var frustum = createFrustum()
         for (pos, mesh) in ecs.iterate(positions, meshes) {
             let bb = mesh.boundingBox
             let bbCenter = Vector3Lerp(bb.min, bb.max, 0.5)
@@ -125,7 +126,7 @@ func FrustumTest(){
                 DrawCube(position, bbSize.x, bbSize.y, bbSize.z, mesh.color)
             }
             else {
-                DrawCubeWires(position, bbSize.x + 0.1, bbSize.z + 0.1, bbSize.y + 0.1, Color(r:255,g:0,b:0,a:200))
+                DrawCubeWires(position, bbSize.x, bbSize.z, bbSize.y, Color(r:255,g:0,b:0,a:200))
             }
         }
 

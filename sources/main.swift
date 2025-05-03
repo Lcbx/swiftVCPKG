@@ -12,10 +12,14 @@ import pocketpy
 
 let WINDOW_SIZE = Vec2(x:1800, y:900)
 
-InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "shadowmap example")
+InitWindow(Int32(WINDOW_SIZE.x), Int32(WINDOW_SIZE.y), "swift raylib experiments")
+
+FrustumTest()
+
+
+SetWindowTitle("Shadow map example"); 
 SetTargetFPS(60)
 
-//FrustumTest()
 
 let SQUARE_N : Int = 15
 let SPACE_SIZE : Int32 = 30
@@ -157,7 +161,6 @@ while !WindowShouldClose()
 	
 	
     BeginDrawing()
-	//rlEnableBackfaceCulling()
 	
 	var lightNearFar = Vec2(x:5,y:100)
 	BeginTextureMode(shadowmap)
@@ -184,7 +187,8 @@ while !WindowShouldClose()
 	SetTraceLogLevel(LOG_INFO.rawValue)
 
     defer {
-        DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY) 
+        DrawText("\(GetFPS())", 10, 10, 20, LIGHTGRAY)
+        DrawText("press R to reload shaders, P to toggle light type (directional/spot)", 10, 30, 20, LIGHTGRAY) 
 		drawshadowmap()
         EndDrawing()
     }
@@ -192,6 +196,7 @@ while !WindowShouldClose()
 	rlSetClipPlanes(0.01, 1000)
 	BeginMode3D(camera)
 		ClearBackground(RAYWHITE)
+		DrawGrid(25, 2.0)
 	
 		DrawSphere(lightCamera.position, 0.6, Color(r: 200, g: 100, b: 0, a: 255))
 		DrawLine3D(lightCamera.position, lightCamera.target, Color(r: 250, g: 50, b: 30, a: 255))
@@ -216,7 +221,8 @@ while !WindowShouldClose()
 CloseWindow()
 
 func drawScene(){
-	DrawCube(Vec3(x: 0, y: -1, z: 0), 50, 1, 50, LIGHTGRAY)
+	// ground
+	DrawCube(Vec3(x: 0, y: -0.51, z: 0), 50, 1, 50, LIGHTGRAY)
 
     //NOTE: drawing must be on main thread
     var frustum = createFrustum()
